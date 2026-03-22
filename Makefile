@@ -1,7 +1,7 @@
 # Diablo 1 Clone - Makefile
 CC = clang
 CFLAGS = -std=c11 -Wall -Wextra -g $(shell sdl2-config --cflags)
-LDFLAGS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_ttf -lm
+LDFLAGS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lm
 
 # Directories
 SRC_DIR = src

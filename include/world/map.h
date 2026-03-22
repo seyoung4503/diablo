@@ -12,6 +12,7 @@ typedef enum {
     TILE_WALL,
     TILE_WATER,
     TILE_DOOR,
+    TILE_STAIRS_UP,
     TILE_STAIRS_DOWN,
     TILE_TREE,
     TILE_TYPE_COUNT

@@ -20,6 +20,7 @@ void tilemap_set_tile(TileMap *map, int x, int y, TileType type)
     case TILE_DIRT:
     case TILE_STONE_FLOOR:
     case TILE_DOOR:
+    case TILE_STAIRS_UP:
     case TILE_STAIRS_DOWN:
         t->walkable = true;
         t->blocks_sight = false;
