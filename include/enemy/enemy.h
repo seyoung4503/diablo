@@ -17,6 +17,11 @@ typedef enum {
     ENEMY_ZOMBIE,      /* slow, tanky */
     ENEMY_SCAVENGER,   /* fast, weak, flees when hurt */
     ENEMY_HIDDEN,      /* ambush from darkness */
+    ENEMY_GOAT_MAN,    /* medium melee, charges */
+    ENEMY_ACID_DOG,    /* fast, poison effect */
+    ENEMY_MAGE,        /* ranged magic caster */
+    ENEMY_KNIGHT,      /* heavy armor, slow */
+    ENEMY_BALROG,      /* boss-tier, rare */
     ENEMY_TYPE_COUNT
 } EnemyType;
 
