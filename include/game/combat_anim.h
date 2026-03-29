@@ -65,6 +65,9 @@ typedef struct CombatAnimSystem {
     CombatText texts[MAX_COMBAT_TEXTS];
     HitReaction reactions[MAX_ENEMIES_ANIM];
     DeathAnim deaths[MAX_ENEMIES_ANIM];
+
+    /* Hitstop: brief freeze on heavy hits */
+    float hitstop_timer;
 } CombatAnimSystem;
 
 /* Default melee timing */
@@ -109,5 +112,9 @@ void combat_anim_render_texts(const CombatAnimSystem *cas, SDL_Renderer *rendere
 
 /* Render death fading sprites (call with enemy texture/position info) */
 void combat_anim_render_deaths(const CombatAnimSystem *cas, SDL_Renderer *renderer);
+
+/* Hitstop: freeze gameplay briefly on heavy hits */
+void combat_anim_hitstop(CombatAnimSystem *cas, float duration);
+bool combat_anim_in_hitstop(const CombatAnimSystem *cas);
 
 #endif
