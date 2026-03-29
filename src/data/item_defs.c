@@ -70,4 +70,27 @@ void item_db_init(ItemDatabase *db)
     /* === Potions (IDs 21-22) — stackable === */
     add_item(db, 21, "Healing Potion",   ITEM_POTION_HP,   RARITY_COMMON, 0, 0, 0, 0, 0, 0, 0, 50, 0,  50, true, 1);
     add_item(db, 22, "Mana Potion",      ITEM_POTION_MANA, RARITY_COMMON, 0, 0, 0, 0, 0, 0, 0, 0, 30,  50, true, 1);
+
+    /* === New Weapons (IDs 23-27) === */
+    add_item(db, 23, "Battle Axe",          ITEM_WEAPON, RARITY_COMMON,  8, 15, 0,  3, 0, 0, 0,  0,  0,  200, false, 4);
+    add_item(db, 24, "Staff of Lightning",  ITEM_WEAPON, RARITY_MAGIC,   4,  8, 0,  0, 2, 5, 0,  0,  0,  400, false, 5);
+    add_item(db, 25, "Deadly Bow",          ITEM_WEAPON, RARITY_MAGIC,   6, 12, 0,  0, 4, 0, 0,  0,  0,  350, false, 4);
+    add_item(db, 26, "Executioner's Blade", ITEM_WEAPON, RARITY_RARE,   12, 20, 0,  5, 0, 0, 0,  0,  0,  800, false, 7);
+    add_item(db, 27, "Infernal Pike",       ITEM_WEAPON, RARITY_UNIQUE, 15, 25, 0,  8, 0, 0, 0,  0,  0, 1200, false, 8);
+
+    /* === New Armor (IDs 28-30) === */
+    add_item(db, 28, "Shadow Cloak",        ITEM_ARMOR,  RARITY_MAGIC,   0,  0,  6, 0, 3, 0, 0,  0,  0,  350, false, 5);
+    add_item(db, 29, "Dragon Scale Mail",   ITEM_ARMOR,  RARITY_RARE,    0,  0, 12, 0, 0, 0, 5,  0,  0,  700, false, 7);
+    add_item(db, 30, "Demonhide Armor",     ITEM_ARMOR,  RARITY_UNIQUE,  0,  0, 15, 3, 0, 0, 3,  0,  0, 1100, false, 10);
+
+    /* === New Accessories (IDs 31-34) === */
+    add_item(db, 31, "Ring of Sorcery",     ITEM_RING,   RARITY_MAGIC,   0,  0,  0, 0, 0, 5, 0,  0, 20,  300, false, 4);
+    add_item(db, 32, "Amulet of the Bear",  ITEM_AMULET, RARITY_MAGIC,   0,  0,  0, 4, 0, 0, 3, 15,  0,  350, false, 5);
+    add_item(db, 33, "Ring of Evasion",     ITEM_RING,   RARITY_MAGIC,   0,  0,  2, 0, 6, 0, 0,  0,  0,  300, false, 4);
+    add_item(db, 34, "Amulet of Arcane Power", ITEM_AMULET, RARITY_UNIQUE, 0, 0, 0, 0, 0, 8, 0,  0, 30,  800, false, 8);
+
+    /* === New Potions (IDs 35-37) === */
+    add_item(db, 35, "Full Healing Potion", ITEM_POTION_HP,   RARITY_MAGIC, 0, 0, 0, 0, 0, 0, 0, 999, 0, 150, true, 5);
+    add_item(db, 36, "Full Mana Potion",    ITEM_POTION_MANA, RARITY_MAGIC, 0, 0, 0, 0, 0, 0, 0, 0, 999, 150, true, 5);
+    add_item(db, 37, "Elixir of Fortitude", ITEM_POTION_HP,   RARITY_RARE,  0, 0, 0, 0, 0, 0, 1, 0,   0, 500, false, 6);
 }
