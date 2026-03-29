@@ -18,6 +18,7 @@
 #include "game/combat_anim.h"
 #include "game/save.h"
 #include "game/stats.h"
+#include "game/spell.h"
 #include "enemy/enemy.h"
 #include "enemy/enemy_ai.h"
 #include "npc/npc.h"
@@ -95,6 +96,10 @@ static EffectsSystem effects;
 
 /* Combat animation system */
 static CombatAnimSystem combat_anim;
+
+/* Spell system */
+static SpellBook spellbook;
+static SpellType active_spell = SPELL_NONE;
 
 /* Title screen menu */
 static int title_selection = 0;
@@ -264,6 +269,10 @@ static void reset_game_state(Game *game, Player *player, Town *town,
     enemy_spawn_group(&enemy_mgr, ENEMY_FALLEN, 28, 8, 3, &town->map);
     enemy_spawn_group(&enemy_mgr, ENEMY_SKELETON, 30, 10, 2, &town->map);
 
+    /* Spell system */
+    spellbook_init(&spellbook);
+    active_spell = SPELL_NONE;
+
     /* UI state */
     show_character_screen = false;
     show_quest_log = false;
@@ -398,6 +407,7 @@ int main(int argc, char *argv[])
 
     /* Initialize one-time databases (survive across new game / load) */
     item_db_init(&item_db);
+    spell_init_data();
     enemy_defs_init();
     dungeon_theme_init();
 
@@ -725,6 +735,17 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
+
+                /* Spell hotkeys */
+                if (key == SDLK_F5) {
+                    active_spell = (active_spell == SPELL_FIREBALL) ? SPELL_NONE : SPELL_FIREBALL;
+                }
+                if (key == SDLK_F6) {
+                    active_spell = (active_spell == SPELL_HEAL) ? SPELL_NONE : SPELL_HEAL;
+                }
+                if (key == SDLK_F7) {
+                    active_spell = (active_spell == SPELL_LIGHTNING) ? SPELL_NONE : SPELL_LIGHTNING;
+                }
                 break;
             }
 
@@ -751,6 +772,51 @@ int main(int argc, char *argv[])
                                                 &event_queue, &rel_graph,
                                                 game_flags);
                     } else if (!show_character_screen && !show_quest_log && !show_inventory) {
+                        /* Spell casting */
+                        if (active_spell != SPELL_NONE && combat_anim_can_act(&combat_anim)) {
+                            const Spell *sp = spell_get(active_spell);
+                            if (sp && spellbook_can_cast(&spellbook, active_spell,
+                                                          player.stats.current_mana, player.stats.magic)) {
+                                if (active_spell == SPELL_HEAL) {
+                                    /* Self-heal */
+                                    int heal = spell_calc_damage(SPELL_HEAL, player.stats.magic);
+                                    player.stats.current_hp += heal;
+                                    if (player.stats.current_hp > player.stats.max_hp)
+                                        player.stats.current_hp = player.stats.max_hp;
+                                    player.stats.current_mana -= sp->mana_cost;
+                                    spellbook_start_cooldown(&spellbook, active_spell);
+                                    effects_spawn_heal(&effects,
+                                        (int)player.world_x - (int)camera.x + SCREEN_WIDTH/2,
+                                        (int)player.world_y - (int)camera.y);
+                                    char heal_str[16];
+                                    snprintf(heal_str, sizeof(heal_str), "+%d", heal);
+                                    combat_anim_spawn_text(&combat_anim,
+                                        (float)((int)player.world_x - (int)camera.x + SCREEN_WIDTH/2),
+                                        (float)((int)player.world_y - (int)camera.y - 30),
+                                        heal_str, (SDL_Color){80, 255, 80, 255});
+                                    active_spell = SPELL_NONE;
+                                } else {
+                                    /* Offensive spell: needs target enemy in range */
+                                    Enemy *spell_target = enemy_at_tile(&enemy_mgr, hover_tile_x, hover_tile_y);
+                                    if (spell_target && spell_target->alive &&
+                                        combat_in_range(player.tile_x, player.tile_y,
+                                                        hover_tile_x, hover_tile_y, sp->range)) {
+                                        player.stats.current_mana -= sp->mana_cost;
+                                        spellbook_start_cooldown(&spellbook, active_spell);
+
+                                        /* Spawn projectile toward enemy */
+                                        float px = player.world_x;
+                                        float py = player.world_y;
+                                        float tx = spell_target->world_x;
+                                        float ty = spell_target->world_y;
+                                        effects_spawn_projectile(&effects, px, py, tx, ty,
+                                                                300.0f, spell_calc_damage(active_spell, player.stats.magic),
+                                                                -1, sp->color);
+                                        active_spell = SPELL_NONE;
+                                    }
+                                }
+                            }
+                        } else {
                         /* Check if clicking on an enemy tile (melee attack) */
                         Enemy *target_enemy = enemy_at_tile(&enemy_mgr, hover_tile_x, hover_tile_y);
                         if (target_enemy && target_enemy->alive &&
@@ -778,6 +844,7 @@ int main(int argc, char *argv[])
                                    tilemap_is_walkable(active_map, hover_tile_x, hover_tile_y)) {
                             /* Click-to-move: pathfind to hovered tile */
                             player_move_to(&player, active_map, hover_tile_x, hover_tile_y);
+                        }
                         }
                     }
                 }
@@ -901,6 +968,52 @@ int main(int argc, char *argv[])
 
             /* Update combat animations */
             combat_anim_update(&combat_anim, dt);
+
+            /* Update spellbook cooldowns */
+            spellbook_update(&spellbook, dt);
+
+            /* Update projectiles and check hits on enemies */
+            effects_update_projectiles(&effects, dt);
+            for (int p = 0; p < MAX_PROJECTILES; p++) {
+                if (!effects.projectiles[p].active) continue;
+                if (effects.projectiles[p].source_id != -1) continue; /* only player projectiles */
+
+                /* Convert projectile world pos to tile */
+                int ptx, pty;
+                screen_to_iso((int)effects.projectiles[p].x, (int)effects.projectiles[p].y, &ptx, &pty);
+
+                for (int e = 0; e < enemy_mgr.count; e++) {
+                    Enemy *en = &enemy_mgr.enemies[e];
+                    if (!en->alive) continue;
+                    if (en->tile_x == ptx && en->tile_y == pty) {
+                        /* Hit! */
+                        int dmg = effects.projectiles[p].damage;
+                        en->current_hp -= dmg;
+                        effects.projectiles[p].active = false;
+
+                        int esx = (int)en->world_x - (int)camera.x + SCREEN_WIDTH/2;
+                        int esy = (int)en->world_y - (int)camera.y;
+                        effects_spawn_blood(&effects, esx, esy);
+                        effects_screen_shake(&effects, 2.0f, 0.1f);
+
+                        char dmg_str[16];
+                        snprintf(dmg_str, sizeof(dmg_str), "%d", dmg);
+                        combat_anim_spawn_text(&combat_anim, (float)esx, (float)esy - 30,
+                                               dmg_str, (SDL_Color){255, 150, 50, 255});
+
+                        if (en->current_hp <= 0) {
+                            en->alive = false;
+                            audio_play_sfx(&audio, SFX_ENEMY_DIE);
+                            stats_add_xp(&player.stats, en->xp_value);
+                            if (en->gold_max > 0) {
+                                int gold = en->gold_min + rand() % (en->gold_max - en->gold_min + 1);
+                                inventory.gold += gold;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
 
             /* Reset to idle after attack finishes */
             if (!combat_anim.player_attack.active && player.anim_state == ANIM_ATTACKING) {
@@ -1283,6 +1396,9 @@ int main(int argc, char *argv[])
         /* Particles (blood, heal, level up) */
         effects_render_particles(&effects, engine.renderer);
 
+        /* Projectiles */
+        effects_render_projectiles(&effects, engine.renderer, cam_x, cam_y, SCREEN_WIDTH / 2);
+
         /* Combat floating texts and death animations */
         combat_anim_render_texts(&combat_anim, engine.renderer, ui.font);
         combat_anim_render_deaths(&combat_anim, engine.renderer);
@@ -1315,6 +1431,17 @@ int main(int argc, char *argv[])
         /* Enhanced HUD: HP/MP bars and level */
         draw_hud(&ui, engine.renderer, &player.stats,
                  VIEWPORT_HEIGHT, PANEL_HEIGHT, SCREEN_WIDTH);
+
+        /* Spell indicator */
+        if (active_spell != SPELL_NONE) {
+            const Spell *sp = spell_get(active_spell);
+            if (sp) {
+                char spell_info[64];
+                snprintf(spell_info, sizeof(spell_info), "[%s] (cost: %d MP)", sp->name, sp->mana_cost);
+                ui_draw_text(&ui, spell_info, SCREEN_WIDTH / 2 - 60, VIEWPORT_HEIGHT - 20,
+                             sp->color);
+            }
+        }
 
         /* HUD info: context-dependent */
         {

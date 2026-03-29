@@ -64,6 +64,7 @@ typedef struct Enemy {
     int gold_min, gold_max;
 
     bool alive;
+    bool is_ranged;         /* uses projectile attacks instead of melee */
 
     /* Animation */
     AnimController anim;

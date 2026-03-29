@@ -37,13 +37,13 @@ void enemy_defs_init(void)
         .gold_min = 0, .gold_max = 5
     };
 
-    /* Skeleton: medium melee */
+    /* Skeleton: medium, can be archers (ranged) */
     templates[ENEMY_SKELETON] = (EnemyTemplate){
         .name = "Skeleton",
         .max_hp = 15, .armor = 3,
         .damage_min = 3, .damage_max = 7,
         .to_hit = 35, .xp_value = 40,
-        .detection_range = 6, .attack_range = 1,
+        .detection_range = 6, .attack_range = 4,
         .attack_cooldown = 1.5f, .move_speed = 2.5f,
         .gold_min = 2, .gold_max = 15
     };
