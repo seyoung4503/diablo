@@ -826,6 +826,7 @@ int main(int argc, char *argv[])
             if (player.stats.current_hp < hp_before_combat) {
                 audio_play_sfx(&audio, SFX_PLAYER_HIT);
                 effects_flash(&effects, (SDL_Color){ 200, 30, 30, 255 }, 0.3f);
+                effects_screen_shake(&effects, 2.0f, 0.1f);
                 int psx, psy;
                 player_get_screen_pos(&player, &psx, &psy);
                 psx = psx - (int)camera.x + SCREEN_WIDTH / 2;
@@ -865,6 +866,8 @@ int main(int argc, char *argv[])
                         if (cr.hit) {
                             audio_play_sfx(&audio, SFX_HIT);
                             effects_spawn_blood(&effects, esx, esy);
+                            if (cr.damage > target->max_hp / 3)
+                                effects_screen_shake(&effects, 3.0f, 0.15f);
                             float kb_dx = (float)(target->tile_x - player.tile_x) * 2.0f;
                             float kb_dy = (float)(target->tile_y - player.tile_y) * 2.0f;
                             combat_anim_hit_reaction(&combat_anim, target_idx, kb_dx, kb_dy);
@@ -1074,8 +1077,8 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        int cam_x = (int)camera.x;
-        int cam_y = (int)camera.y;
+        int cam_x = (int)camera.x + effects_get_shake_x(&effects);
+        int cam_y = (int)camera.y + effects_get_shake_y(&effects);
 
         /* Set clip rect to viewport (above the UI panel) */
         SDL_Rect viewport_clip = { 0, 0, SCREEN_WIDTH, VIEWPORT_HEIGHT };
