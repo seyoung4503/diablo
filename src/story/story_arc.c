@@ -125,6 +125,29 @@ void story_arc_init(StoryArcSystem *sys)
     add_stage(arc, -1, -1, 20,
         "Gharbad has found his place. He tends a small herb garden "
         "near Adria's hut and is finally at peace.");
+
+    /* ------------------------------------------------------------------ */
+    /* Chapter Progress (meta-arc, npc_id=-1): Overall game progression    */
+    /* ------------------------------------------------------------------ */
+    arc = add_arc(sys, -1);
+    add_stage(arc, -1, -1, -1,
+        "Tristram: The hero arrives in town. The cathedral looms in "
+        "the distance, its evil not yet confronted.");
+    add_stage(arc, 1, -1, -1,
+        "Cathedral: The hero has entered the cathedral and begun "
+        "clearing levels 1 through 4 of the undead.");
+    add_stage(arc, 10, -1, -1,
+        "Catacombs: The hero descends into the catacombs, navigating "
+        "levels 5 through 8 and the Halls of the Blind.");
+    add_stage(arc, 11, -1, -1,
+        "Caves: The hero fights through the caves on levels 9 through "
+        "12, seeking Arkaine's Valor and greater challenges.");
+    add_stage(arc, 13, -1, -1,
+        "Hell: The hero has reached the deepest levels, 13 through 16. "
+        "The Lord of Terror's domain awaits.");
+    add_stage(arc, -1, -1, -1,
+        "Victory: The hero has reached level 16 and returned to "
+        "Tristram. The Lord of Terror is defeated.");
 }
 
 void story_arc_update(StoryArcSystem *sys, NPCManager *npcs,

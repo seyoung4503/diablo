@@ -153,6 +153,22 @@ static void init_griswold(DialogueSystem *ds)
         "I don't trust magic, but... she hasn't steered anyone wrong. Yet.");
     add_choice(n, "Good to know.", -1);
     add_choice(n, "Back to other matters.", 0);
+
+    /* Quest 11: Valor — quest giver */
+    n = add_node(ds, 11, NPC_ID_GRISWOLD,
+        "There's a legend about Arkaine's Valor — enchanted armor lost "
+        "deep in the caves. If you find it, bring it to me.");
+    c = add_choice(n, "I'll search the caves for it.", 12);
+    add_consequence(c, CONSEQ_SET_FLAG, FLAG_VALOR_QUEST, 0, 0);
+    add_consequence(c, CONSEQ_MODIFY_TRUST, NPC_ID_GRISWOLD, 0, 0.1f);
+    add_choice(n, "Enchanted armor? Sounds too good to be true.", -1);
+
+    /* Quest 11: Valor — quest active */
+    n = add_node(ds, 12, NPC_ID_GRISWOLD,
+        "The caves are treacherous, but Arkaine's Valor is worth the risk. "
+        "Fight through levels nine to twelve and you may find it.");
+    add_choice(n, "I won't stop until I find it.", -1);
+    add_choice(n, "Back to other matters.", 0);
 }
 
 /* ===== NPC_ID_PEPIN (1) — Nodes 100-199 ===== */
@@ -306,6 +322,55 @@ static void init_cain(DialogueSystem *ds)
         "secrets from when he ventured below.");
     c = add_choice(n, "I'll seek them out.", -1);
     add_consequence(c, CONSEQ_GIVE_XP, 10, 0, 0);
+
+    /* Quest 10: Halls of the Blind — quest giver */
+    n = add_node(ds, 210, NPC_ID_CAIN,
+        "I have found references to the Halls of the Blind in ancient texts. "
+        "A passage in the catacombs, level six. Treasure lies within.");
+    c = add_choice(n, "I'll find the Halls of the Blind.", 211);
+    add_consequence(c, CONSEQ_SET_FLAG, FLAG_HALLS_OF_BLIND, 0, 0);
+    add_consequence(c, CONSEQ_MODIFY_TRUST, NPC_ID_CAIN, 0, 0.1f);
+    add_choice(n, "The catacombs are dangerous enough already.", -1);
+
+    /* Quest 10: Halls of the Blind — quest active */
+    n = add_node(ds, 211, NPC_ID_CAIN,
+        "The blind lead the blind in those halls. Trust your other senses. "
+        "Find the stairs and the treasure will reveal itself.");
+    add_choice(n, "I understand.", -1);
+    add_choice(n, "I have other questions.", 200);
+
+    /* Quest 12: The Chamber of Bone — quest giver */
+    n = add_node(ds, 212, NPC_ID_CAIN,
+        "Beyond the Halls of the Blind lies a chamber of bone. The undead "
+        "gather there in great numbers. It must be cleansed.");
+    c = add_choice(n, "I'll clear the Chamber of Bone.", 213);
+    add_consequence(c, CONSEQ_SET_FLAG, FLAG_CHAMBER_OF_BONE, 0, 0);
+    add_consequence(c, CONSEQ_MODIFY_TRUST, NPC_ID_CAIN, 0, 0.1f);
+    add_choice(n, "That sounds like a death wish.", -1);
+
+    /* Quest 12: The Chamber of Bone — quest active */
+    n = add_node(ds, 213, NPC_ID_CAIN,
+        "The eighth level holds the Chamber of Bone. Destroy twenty of "
+        "the undead within and the chamber's power will be broken.");
+    add_choice(n, "Consider it done.", -1);
+    add_choice(n, "I have other questions.", 200);
+
+    /* Quest 13: Diablo's Domain — quest giver */
+    n = add_node(ds, 214, NPC_ID_CAIN,
+        "The time has come. You must descend to the deepest level of Hell "
+        "and face the Lord of Terror himself. All sixteen levels await.");
+    c = add_choice(n, "I will face Diablo.", 215);
+    add_consequence(c, CONSEQ_SET_FLAG, FLAG_DIABLOS_DOMAIN, 0, 0);
+    add_consequence(c, CONSEQ_MODIFY_TRUST, NPC_ID_CAIN, 0, 0.15f);
+    add_consequence(c, CONSEQ_GIVE_XP, 50, 0, 0);
+    add_choice(n, "I'm not ready yet.", -1);
+
+    /* Quest 13: Diablo's Domain — quest active */
+    n = add_node(ds, 215, NPC_ID_CAIN,
+        "Descend through the cathedral, catacombs, caves, and into Hell. "
+        "Reach level sixteen. Tristram's fate rests with you.");
+    add_choice(n, "I will not fail.", -1);
+    add_choice(n, "I have other questions.", 200);
 }
 
 /* ===== NPC_ID_OGDEN (3) — Nodes 300-399 ===== */
@@ -378,6 +443,23 @@ static void init_ogden(DialogueSystem *ds)
     add_consequence(c, CONSEQ_MODIFY_TRUST, NPC_ID_OGDEN, 0, 0.1f);
     add_consequence(c, CONSEQ_MODIFY_MOOD, NPC_ID_OGDEN, 0, 0.15f);
     add_consequence(c, CONSEQ_WORLD_EVENT, EVT_PLAYER_HELPED_NPC, NPC_ID_OGDEN, 0.3f);
+
+    /* Quest 9: The Butcher's Lair — quest giver */
+    n = add_node(ds, 308, NPC_ID_OGDEN,
+        "There's a demon called The Butcher on the second level below. "
+        "Farnham screams about it in his sleep. Please, end it.");
+    c = add_choice(n, "I'll hunt The Butcher down.", 309);
+    add_consequence(c, CONSEQ_SET_FLAG, FLAG_BUTCHERS_LAIR, 0, 0);
+    add_consequence(c, CONSEQ_MODIFY_TRUST, NPC_ID_OGDEN, 0, 0.15f);
+    add_consequence(c, CONSEQ_WORLD_EVENT, EVT_PLAYER_HELPED_NPC, NPC_ID_OGDEN, 0.3f);
+    add_choice(n, "The Butcher sounds... formidable.", -1);
+
+    /* Quest 9: The Butcher's Lair — quest active */
+    n = add_node(ds, 309, NPC_ID_OGDEN,
+        "Descend to the second level and slay the beasts there. "
+        "Kill ten of them and The Butcher's hold will be broken.");
+    add_choice(n, "It will be done.", -1);
+    add_choice(n, "Back to other matters.", 300);
 }
 
 /* ===== NPC_ID_FARNHAM (4) — Nodes 400-499 ===== */
@@ -660,6 +742,49 @@ static void init_gharbad(DialogueSystem *ds)
     add_consequence(c, CONSEQ_MODIFY_MOOD, NPC_ID_GHARBAD, 0, -0.3f);
 }
 
+/* ===== NPC_ID_WIRT (8) — Nodes 800-899 ===== */
+static void init_wirt(DialogueSystem *ds)
+{
+    DialogueNode *n;
+    DialogueChoice *c;
+
+    /* Greeting */
+    n = add_node(ds, 800, NPC_ID_WIRT,
+        "Psst! Hey, you! Looking for something special? "
+        "Wirt's got the goods... for a price.");
+    add_choice(n, "What do you have?", 801);
+    add_choice(n, "I heard you lost something.", 803);
+    add_choice(n, "Not interested.", -1);
+
+    /* Path A: Wares */
+    n = add_node(ds, 801, NPC_ID_WIRT,
+        "Only the finest! Fell off a wagon. Or out of a dungeon. "
+        "Look, don't ask questions and I won't charge extra.");
+    add_choice(n, "Show me.", 802);
+    add_choice(n, "Back to other matters.", 800);
+
+    n = add_node(ds, 802, NPC_ID_WIRT,
+        "You see? Quality goods. A bit scuffed, maybe, but what isn't "
+        "in this town? Take it or leave it.");
+    add_choice(n, "I'll think about it.", -1);
+
+    /* Quest 14: Wirt's Leg — quest giver */
+    n = add_node(ds, 803, NPC_ID_WIRT,
+        "My leg! My wooden leg went missing in the catacombs. "
+        "There's treasure hidden inside it. Find it for me, will ya?");
+    c = add_choice(n, "I'll look for your leg in the catacombs.", 804);
+    add_consequence(c, CONSEQ_SET_FLAG, FLAG_WIRTS_LEG, 0, 0);
+    add_consequence(c, CONSEQ_MODIFY_TRUST, NPC_ID_WIRT, 0, 0.2f);
+    add_choice(n, "A wooden leg with treasure? Sure...", -1);
+
+    /* Quest 14: Wirt's Leg — quest active */
+    n = add_node(ds, 804, NPC_ID_WIRT,
+        "Level five of the catacombs. Kill the monsters guarding it "
+        "and you'll find my leg. Bring it back and we split the loot!");
+    add_choice(n, "I'm on it.", -1);
+    add_choice(n, "Back to other matters.", 800);
+}
+
 void dialogue_data_init(DialogueSystem *ds)
 {
     init_griswold(ds);
@@ -670,4 +795,5 @@ void dialogue_data_init(DialogueSystem *ds)
     init_adria(ds);
     init_theo(ds);
     init_gharbad(ds);
+    init_wirt(ds);
 }

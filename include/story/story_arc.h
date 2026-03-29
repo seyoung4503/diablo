@@ -4,7 +4,7 @@
 #include "npc/npc.h"
 #include "story/quest.h"
 
-#define MAX_ARC_STAGES 5
+#define MAX_ARC_STAGES 8
 
 typedef struct StoryArcStage {
     int required_quest_id;    /* quest that must be completed (or -1) */
