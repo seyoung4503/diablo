@@ -8,6 +8,14 @@ void combat_anim_init(CombatAnimSystem *cas)
 
 void combat_anim_update(CombatAnimSystem *cas, float dt)
 {
+    /* Hitstop: decrement timer and freeze all animations */
+    if (cas->hitstop_timer > 0) {
+        cas->hitstop_timer -= dt;
+        if (cas->hitstop_timer < 0)
+            cas->hitstop_timer = 0;
+        return;
+    }
+
     /* Update player attack phase timers */
     AttackAnimation *atk = &cas->player_attack;
     if (atk->active) {
@@ -170,6 +178,16 @@ bool combat_anim_get_hit_offset(const CombatAnimSystem *cas, int enemy_idx,
     *dx = hr->knockback_dx * fade;
     *dy = hr->knockback_dy * fade;
     return true;
+}
+
+void combat_anim_hitstop(CombatAnimSystem *cas, float duration)
+{
+    cas->hitstop_timer = duration;
+}
+
+bool combat_anim_in_hitstop(const CombatAnimSystem *cas)
+{
+    return cas->hitstop_timer > 0;
 }
 
 void combat_anim_render_texts(const CombatAnimSystem *cas, SDL_Renderer *renderer,

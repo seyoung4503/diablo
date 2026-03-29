@@ -172,6 +172,26 @@ void effects_spawn_magic(EffectsSystem *fx, int screen_x, int screen_y)
     }
 }
 
+void effects_spawn_impact(EffectsSystem *fx, int screen_x, int screen_y, SDL_Color color)
+{
+    /* 12 particles in a radial burst pattern */
+    for (int i = 0; i < 12; i++) {
+        Particle *p = find_free_particle(&fx->particles);
+        if (!p) break;
+        float angle = (float)i / 12.0f * 6.2832f;  /* 2*PI */
+        float speed = 40.0f + randf(0, 30.0f);
+        p->active = true;
+        p->x = (float)screen_x;
+        p->y = (float)screen_y;
+        p->vx = cosf(angle) * speed;
+        p->vy = sinf(angle) * speed;
+        p->life = 0.2f + randf(0, 0.15f);
+        p->max_life = p->life;
+        p->color = color;
+        p->size = 2;
+    }
+}
+
 /* ── render particles ────────────────────────────────────────────────── */
 
 void effects_render_particles(EffectsSystem *fx, SDL_Renderer *renderer)

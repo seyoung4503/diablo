@@ -854,6 +854,12 @@ int main(int argc, char *argv[])
 
         /* ---- UPDATE (gameplay scenes only) ---- */
         if (in_gameplay && !player_dead) {
+            /* Hitstop: freeze movement/combat/AI but keep effects ticking */
+            bool hitstop_active = combat_anim_in_hitstop(&combat_anim);
+            if (hitstop_active) {
+                combat_anim_update(&combat_anim, dt);
+            }
+
             /* Camera scroll from keyboard input (disabled during dialogue) */
             if (!in_dialogue) {
                 float scroll_speed = camera.speed * dt;
@@ -871,6 +877,7 @@ int main(int argc, char *argv[])
             if (dialogue_is_active(&dialogue))
                 dialogue_update(&dialogue, dt);
 
+            if (!hitstop_active) {
             /* Update player movement (blocked during attack animation) */
             if (combat_anim_can_act(&combat_anim))
                 player_update(&player, dt, active_map);
@@ -933,8 +940,12 @@ int main(int argc, char *argv[])
                         if (cr.hit) {
                             audio_play_sfx(&audio, SFX_HIT);
                             effects_spawn_blood(&effects, esx, esy);
-                            if (cr.damage > target->max_hp / 3)
+                            effects_spawn_impact(&effects, esx, esy,
+                                                 (SDL_Color){255, 160, 50, 255});
+                            if (cr.damage > target->max_hp / 3) {
                                 effects_screen_shake(&effects, 3.0f, 0.15f);
+                                combat_anim_hitstop(&combat_anim, 0.04f);
+                            }
                             float kb_dx = (float)(target->tile_x - player.tile_x) * 2.0f;
                             float kb_dy = (float)(target->tile_y - player.tile_y) * 2.0f;
                             combat_anim_hit_reaction(&combat_anim, target_idx, kb_dx, kb_dy);
@@ -947,6 +958,7 @@ int main(int argc, char *argv[])
                                                    "MISS", (SDL_Color){180, 180, 180, 255});
                         }
                         if (!target->alive) {
+                            combat_anim_hitstop(&combat_anim, 0.08f);
                             audio_play_sfx(&audio, SFX_ENEMY_DIE);
                             combat_anim_start_death(&combat_anim, target_idx, target->id,
                                                     (float)esx, (float)esy,
@@ -1019,6 +1031,7 @@ int main(int argc, char *argv[])
             if (!combat_anim.player_attack.active && player.anim_state == ANIM_ATTACKING) {
                 player.anim_state = ANIM_IDLE;
             }
+            } /* end if (!hitstop_active) */
 
             /* Check player death */
             if (player.stats.current_hp <= 0) {
@@ -1294,16 +1307,24 @@ int main(int argc, char *argv[])
             e_sx += (int)hit_dx;
             e_sy += (int)hit_dy;
 
+            /* Color based on variant */
+            Uint8 tint_r = 255, tint_g = 80, tint_b = 80;
+            if (e->variant == ENEMY_VARIANT_ELITE) {
+                tint_r = 200; tint_g = 50; tint_b = 255;
+            } else if (e->variant == ENEMY_VARIANT_CHAMPION) {
+                tint_r = 255; tint_g = 200; tint_b = 50;
+            }
+
             if (e->anim.sheet) {
                 SDL_Rect src = anim_controller_get_src_rect(&e->anim);
                 SDL_Texture *sheet_tex = e->anim.sheet->texture;
-                SDL_SetTextureColorMod(sheet_tex, 255, 80, 80);
+                SDL_SetTextureColorMod(sheet_tex, tint_r, tint_g, tint_b);
                 iso_draw_animated_sprite(&iso_renderer, sheet_tex, src,
                                          (int)e->world_x, (int)e->world_y,
                                          cam_x, cam_y, SPRITE_SIZE, SPRITE_SIZE);
                 SDL_SetTextureColorMod(sheet_tex, 255, 255, 255);
             } else if (tex_warrior) {
-                SDL_SetTextureColorMod(tex_warrior, 255, 80, 80);
+                SDL_SetTextureColorMod(tex_warrior, tint_r, tint_g, tint_b);
                 SDL_Rect dst = { e_sx, e_sy, SPRITE_SIZE, SPRITE_SIZE };
                 SDL_RenderCopy(engine.renderer, tex_warrior, NULL, &dst);
                 SDL_SetTextureColorMod(tex_warrior, 255, 255, 255);
@@ -1320,9 +1341,12 @@ int main(int argc, char *argv[])
 
             /* Show enemy name on hover */
             if (hover_tile_x == e->tile_x && hover_tile_y == e->tile_y) {
-                char label[48];
-                snprintf(label, sizeof(label), "%s (HP: %d/%d)",
-                         e->name, e->current_hp, e->max_hp);
+                char label[64];
+                const char *prefix = "";
+                if (e->variant == ENEMY_VARIANT_CHAMPION) prefix = "Champion ";
+                else if (e->variant == ENEMY_VARIANT_ELITE) prefix = "Elite ";
+                snprintf(label, sizeof(label), "%s%s (HP: %d/%d)",
+                         prefix, e->name, e->current_hp, e->max_hp);
                 int label_x = e_sx + SPRITE_SIZE / 2 - 50;
                 int label_y = e_sy - 14;
                 ui_draw_text(&ui, label, label_x, label_y,

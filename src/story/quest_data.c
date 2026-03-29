@@ -295,4 +295,146 @@ void quest_data_init(QuestLog *ql)
     outcome_add_event(&q->outcomes[2], EVT_PLAYER_HELPED_NPC, 17, 0.4f);
     outcome_add_event(&q->outcomes[2], EVT_PLAYER_HELPED_NPC, 1, 0.1f);
     outcome_add_event(&q->outcomes[2], EVT_GOSSIP_GOOD, -1, 0.1f);
+
+    /* ------------------------------------------------------------------ */
+    /* Quest 9: "The Butcher's Lair" (giver: Ogden, id=2)                 */
+    /* ------------------------------------------------------------------ */
+    q = add_quest(ql, 9, "The Butcher's Lair",
+        "Ogden speaks of a terrible creature in the cathedral's first "
+        "level. A demon called The Butcher has been terrorizing those "
+        "who venture below.", 2, -1);
+
+    q->objective_count = 1;
+    set_objective(&q->objectives[0], OBJ_KILL_ENEMIES, -1, 10,
+                  "Kill 10 enemies on dungeon level 2");
+
+    q->outcome_count = 1;
+    set_outcome(&q->outcomes[0],
+        "The Butcher is slain. Ogden raises a toast in your honor, and "
+        "the townsfolk breathe a little easier.",
+        80, 300, 200);
+    outcome_add_event(&q->outcomes[0], EVT_THREAT_DECREASED, -1, 0.4f);
+    outcome_add_event(&q->outcomes[0], EVT_GOSSIP_GOOD, 2, 0.3f);
+    outcome_add_event(&q->outcomes[0], EVT_PLAYER_COMPLETED_QUEST, -1, 0.2f);
+
+    /* ------------------------------------------------------------------ */
+    /* Quest 10: "Halls of the Blind" (giver: Cain, id=4)                 */
+    /* ------------------------------------------------------------------ */
+    q = add_quest(ql, 10, "Halls of the Blind",
+        "Cain has uncovered a passage in the catacombs where the blind "
+        "lead the blind. Ancient texts speak of a treasure hidden "
+        "within.", 4, -1);
+
+    q->objective_count = 1;
+    set_objective(&q->objectives[0], OBJ_REACH_LOCATION, LOC_CATHEDRAL, 0,
+                  "Find and reach the stairs on dungeon level 6");
+
+    q->outcome_count = 1;
+    set_outcome(&q->outcomes[0],
+        "You navigate the Halls of the Blind and uncover the ancient "
+        "treasure. Cain is fascinated by your discoveries.",
+        81, 250, 300);
+    outcome_add_event(&q->outcomes[0], EVT_PLAYER_COMPLETED_QUEST, 4, 0.2f);
+    outcome_add_event(&q->outcomes[0], EVT_GOSSIP_GOOD, -1, 0.2f);
+
+    /* ------------------------------------------------------------------ */
+    /* Quest 11: "Valor" (giver: Griswold, id=0)                          */
+    /* ------------------------------------------------------------------ */
+    q = add_quest(ql, 11, "Valor",
+        "Griswold tells of an enchanted suit of armor lost deep in the "
+        "caves. It was worn by Arkaine, the great warrior of legend.", 0, -1);
+
+    q->objective_count = 1;
+    set_objective(&q->objectives[0], OBJ_KILL_ENEMIES, -1, 15,
+                  "Kill 15 enemies in the caves (levels 9-12)");
+
+    q->outcome_count = 2;
+
+    /* Outcome A: Return the armor to Griswold */
+    set_outcome(&q->outcomes[0],
+        "You recover Arkaine's Valor. Griswold reverently repairs the "
+        "legendary armor and presents it to you.",
+        82, 400, 0);
+    outcome_add_event(&q->outcomes[0], EVT_PLAYER_HELPED_NPC, 0, 0.3f);
+    outcome_add_event(&q->outcomes[0], EVT_GOSSIP_GOOD, 0, 0.2f);
+    outcome_add_event(&q->outcomes[0], EVT_PLAYER_COMPLETED_QUEST, -1, 0.2f);
+
+    /* Outcome B: Keep it for yourself */
+    set_outcome(&q->outcomes[1],
+        "You don the armor yourself without telling Griswold. "
+        "Its power is undeniable, but trust is harder to forge.",
+        83, 300, 100);
+    outcome_add_event(&q->outcomes[1], EVT_PLAYER_HARMED_NPC, 0, 0.2f);
+    outcome_add_event(&q->outcomes[1], EVT_GOSSIP_BAD, 0, 0.15f);
+
+    /* ------------------------------------------------------------------ */
+    /* Quest 12: "The Chamber of Bone" (giver: Cain, id=4)                */
+    /* ------------------------------------------------------------------ */
+    q = add_quest(ql, 12, "The Chamber of Bone",
+        "Beyond the halls of the blind lies a chamber of bone, where "
+        "the undead mass in great numbers. Clear this abomination.", 4, -1);
+
+    q->objective_count = 1;
+    set_objective(&q->objectives[0], OBJ_KILL_ENEMIES, -1, 20,
+                  "Kill 20 enemies on dungeon level 8");
+
+    q->outcome_count = 1;
+    set_outcome(&q->outcomes[0],
+        "The Chamber of Bone is cleansed. Among the remains you find "
+        "an ancient tome that Cain is eager to study.",
+        84, 350, 250);
+    outcome_add_event(&q->outcomes[0], EVT_THREAT_DECREASED, -1, 0.3f);
+    outcome_add_event(&q->outcomes[0], EVT_PLAYER_COMPLETED_QUEST, 4, 0.2f);
+    outcome_add_event(&q->outcomes[0], EVT_GOSSIP_GOOD, -1, 0.15f);
+
+    /* ------------------------------------------------------------------ */
+    /* Quest 13: "Diablo's Domain" (giver: Cain, id=4)                    */
+    /* ------------------------------------------------------------------ */
+    q = add_quest(ql, 13, "Diablo's Domain",
+        "The Lord of Terror awaits in the deepest depths of Hell. "
+        "You must descend through all 16 levels to face the ultimate "
+        "evil.", 4, -1);
+
+    q->objective_count = 1;
+    set_objective(&q->objectives[0], OBJ_REACH_LOCATION, LOC_CATHEDRAL, 0,
+                  "Reach dungeon level 16");
+
+    q->outcome_count = 1;
+    set_outcome(&q->outcomes[0],
+        "You have reached the deepest level of Hell. The Lord of Terror "
+        "awaits. Tristram's fate rests upon your shoulders.",
+        85, 500, 500);
+    outcome_add_event(&q->outcomes[0], EVT_THREAT_DECREASED, -1, 0.5f);
+    outcome_add_event(&q->outcomes[0], EVT_PLAYER_COMPLETED_QUEST, -1, 0.3f);
+    outcome_add_event(&q->outcomes[0], EVT_GOSSIP_GOOD, -1, 0.3f);
+
+    /* ------------------------------------------------------------------ */
+    /* Quest 14: "Wirt's Leg" (giver: Wirt, id=7)                         */
+    /* ------------------------------------------------------------------ */
+    q = add_quest(ql, 14, "Wirt's Leg",
+        "Wirt has a peculiar request - find his lost wooden leg "
+        "somewhere in the catacombs. He swears it contains hidden "
+        "treasure.", 7, -1);
+
+    q->objective_count = 1;
+    set_objective(&q->objectives[0], OBJ_KILL_ENEMIES, -1, 5,
+                  "Kill 5 enemies on dungeon level 5");
+
+    q->outcome_count = 2;
+
+    /* Outcome A: Return the leg to Wirt */
+    set_outcome(&q->outcomes[0],
+        "You find Wirt's wooden leg and the treasure hidden inside. "
+        "Wirt is delighted to have it back.",
+        86, 150, 100);
+    outcome_add_event(&q->outcomes[0], EVT_PLAYER_HELPED_NPC, 7, 0.3f);
+    outcome_add_event(&q->outcomes[0], EVT_GOSSIP_GOOD, 7, 0.2f);
+
+    /* Outcome B: Keep the treasure */
+    set_outcome(&q->outcomes[1],
+        "You pocket the treasure from the wooden leg. Wirt won't be "
+        "happy, but gold is gold.",
+        87, 50, 300);
+    outcome_add_event(&q->outcomes[1], EVT_PLAYER_HARMED_NPC, 7, 0.3f);
+    outcome_add_event(&q->outcomes[1], EVT_GOSSIP_BAD, 7, 0.2f);
 }

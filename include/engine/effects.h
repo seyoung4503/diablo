@@ -65,6 +65,7 @@ void effects_spawn_blood(EffectsSystem *fx, int screen_x, int screen_y);
 void effects_spawn_heal(EffectsSystem *fx, int screen_x, int screen_y);
 void effects_spawn_levelup(EffectsSystem *fx, int screen_x, int screen_y);
 void effects_spawn_magic(EffectsSystem *fx, int screen_x, int screen_y);
+void effects_spawn_impact(EffectsSystem *fx, int screen_x, int screen_y, SDL_Color color);
 void effects_render_particles(EffectsSystem *fx, SDL_Renderer *renderer);
 
 /* Fog of war — darken tiles far from player */
