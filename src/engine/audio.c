@@ -4,12 +4,12 @@
 
 /* File paths for music tracks */
 static const char *music_files[MUSIC_COUNT] = {
-    "assets/audio/music/town.mp3",
-    "assets/audio/music/dungeon1.mp3",
-    "assets/audio/music/dungeon2.mp3",
-    "assets/audio/music/dungeon3.mp3",
-    "assets/audio/music/dungeon4.mp3",
-    "assets/audio/music/title.mp3",
+    "assets/audio/music/town.wav",
+    "assets/audio/music/dungeon1.wav",
+    "assets/audio/music/dungeon2.wav",
+    "assets/audio/music/dungeon3.wav",
+    "assets/audio/music/dungeon4.wav",
+    "assets/audio/music/title.wav",
 };
 
 /* File paths for sound effects */
