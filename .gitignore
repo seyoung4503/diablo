@@ -27,6 +27,9 @@ Thumbs.db
 # Assets (generated)
 assets/generated/
 
+# Save data
+*.dat
+
 # Debug
 core
 *.dSYM/
