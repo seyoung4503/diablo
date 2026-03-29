@@ -97,6 +97,30 @@ void enemy_spawn(EnemyManager *mgr, EnemyType type, int x, int y)
     mgr->count++;
     enemy_apply_template(e);
 
+    /* Variant roll: 15% champion, 5% elite */
+    int variant_roll = rand() % 100;
+    if (variant_roll < 5) {
+        e->variant = ENEMY_VARIANT_ELITE;
+        e->max_hp = e->max_hp * 3;
+        e->current_hp = e->max_hp;
+        e->damage_min += 5;
+        e->damage_max += 10;
+        e->armor += 5;
+        e->xp_value *= 4;
+        e->gold_max *= 3;
+    } else if (variant_roll < 20) {
+        e->variant = ENEMY_VARIANT_CHAMPION;
+        e->max_hp = e->max_hp * 2;
+        e->current_hp = e->max_hp;
+        e->damage_min += 2;
+        e->damage_max += 5;
+        e->armor += 2;
+        e->xp_value *= 2;
+        e->gold_max *= 2;
+    } else {
+        e->variant = ENEMY_VARIANT_NORMAL;
+    }
+
     /* Ranged flag: enemies with attack_range > 1 use projectiles */
     e->is_ranged = (e->attack_range > 1);
 }

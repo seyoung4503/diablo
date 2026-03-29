@@ -34,9 +34,16 @@ typedef enum {
     ENEMY_STATE_DEAD
 } EnemyState;
 
+typedef enum {
+    ENEMY_VARIANT_NORMAL = 0,
+    ENEMY_VARIANT_CHAMPION,
+    ENEMY_VARIANT_ELITE
+} EnemyVariant;
+
 typedef struct Enemy {
     uint32_t id;
     EnemyType type;
+    EnemyVariant variant;
     char name[32];
     EnemyState state;
 
