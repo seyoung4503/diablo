@@ -2,6 +2,7 @@
 #define DIABLO_ENEMY_ENEMY_H
 
 #include "common.h"
+#include "engine/animation.h"
 #include "world/pathfinding.h"
 
 #define MAX_ENEMIES_PER_LEVEL 32
@@ -63,6 +64,10 @@ typedef struct Enemy {
     int gold_min, gold_max;
 
     bool alive;
+
+    /* Animation */
+    AnimController anim;
+    int sprite_sheet_id;    /* index into SpriteSheetManager, -1 = none */
 } Enemy;
 
 typedef struct EnemyManager {

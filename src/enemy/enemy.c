@@ -58,6 +58,8 @@ void enemy_manager_update(EnemyManager *mgr, float dt, const struct TileMap *map
                 e->world_y = from_sy + (to_sy - from_sy) * t;
             }
         }
+
+        anim_controller_update(&e->anim, dt);
     }
 }
 
@@ -87,6 +89,9 @@ void enemy_spawn(EnemyManager *mgr, EnemyType type, int x, int y)
     e->world_y = (float)sy;
 
     path_clear(&e->path);
+
+    memset(&e->anim, 0, sizeof(e->anim));
+    e->sprite_sheet_id = -1;
 
     /* Apply stats from enemy type template */
     mgr->count++;

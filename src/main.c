@@ -1,4 +1,5 @@
 #include "common.h"
+#include "engine/animation.h"
 #include "engine/engine.h"
 #include "engine/renderer.h"
 #include "engine/input.h"
@@ -46,6 +47,9 @@ static int hover_tile_y = -1;
 
 /* Character screen toggle */
 static bool show_character_screen = false;
+
+/* Animation sprite sheet manager */
+static SpriteSheetManager sprite_mgr;
 
 /* NPC system state */
 static NPCManager npc_mgr;
@@ -403,6 +407,16 @@ int main(int argc, char *argv[])
     story_arc_init(&story_arcs);
     inventory_init(&inventory);
     enemy_manager_init(&enemy_mgr);
+    spritesheet_manager_init(&sprite_mgr);
+
+    /* Try to load sprite sheets (graceful — game works without them) */
+    int warrior_sheet_id = spritesheet_load(&sprite_mgr, engine.renderer,
+        "assets/sprites/player/warrior_sheet.png", 96, 96);
+    if (warrior_sheet_id >= 0) {
+        SpriteSheet *ws = (SpriteSheet *)spritesheet_get(&sprite_mgr, warrior_sheet_id);
+        if (ws) spritesheet_apply_defaults(ws);
+        anim_controller_init(&player.anim, spritesheet_get(&sprite_mgr, warrior_sheet_id));
+    }
 
     /* Start at title screen */
     current_scene = SCENE_TITLE;
@@ -1071,17 +1085,22 @@ int main(int argc, char *argv[])
                                     cam_x, cam_y, highlight);
         }
 
-        /* Player sprite */
+        /* Player sprite — 3-tier: animated sheet > static texture > procedural */
         {
             int draw_sx, draw_sy;
             player_get_screen_pos(&player, &draw_sx, &draw_sy);
             draw_sx = draw_sx - cam_x + (SCREEN_WIDTH / 2) - SPRITE_SIZE / 2;
             draw_sy = draw_sy - cam_y - SPRITE_SIZE + TILE_HALF_H;
-            if (tex_warrior) {
+
+            if (player.anim.sheet) {
+                SDL_Rect src = anim_controller_get_src_rect(&player.anim);
+                iso_draw_animated_sprite(&iso_renderer, player.anim.sheet->texture,
+                                         src, (int)player.world_x, (int)player.world_y,
+                                         cam_x, cam_y, SPRITE_SIZE, SPRITE_SIZE);
+            } else if (tex_warrior) {
                 SDL_Rect dst = { draw_sx, draw_sy, SPRITE_SIZE, SPRITE_SIZE };
                 SDL_RenderCopy(engine.renderer, tex_warrior, NULL, &dst);
             } else {
-                /* Procedural fallback */
                 SDL_Color player_body = { 60, 60, 120, 255 };
                 SDL_Color player_head = { 200, 170, 140, 255 };
                 iso_draw_character(&iso_renderer,
@@ -1099,7 +1118,15 @@ int main(int argc, char *argv[])
             int e_sx = (int)e->world_x - cam_x + (SCREEN_WIDTH / 2) - SPRITE_SIZE / 2;
             int e_sy = (int)e->world_y - cam_y - SPRITE_SIZE + TILE_HALF_H;
 
-            if (tex_warrior) {
+            if (e->anim.sheet) {
+                SDL_Rect src = anim_controller_get_src_rect(&e->anim);
+                SDL_Texture *sheet_tex = e->anim.sheet->texture;
+                SDL_SetTextureColorMod(sheet_tex, 255, 80, 80);
+                iso_draw_animated_sprite(&iso_renderer, sheet_tex, src,
+                                         (int)e->world_x, (int)e->world_y,
+                                         cam_x, cam_y, SPRITE_SIZE, SPRITE_SIZE);
+                SDL_SetTextureColorMod(sheet_tex, 255, 255, 255);
+            } else if (tex_warrior) {
                 SDL_SetTextureColorMod(tex_warrior, 255, 80, 80);
                 SDL_Rect dst = { e_sx, e_sy, SPRITE_SIZE, SPRITE_SIZE };
                 SDL_RenderCopy(engine.renderer, tex_warrior, NULL, &dst);
@@ -1258,6 +1285,7 @@ int main(int argc, char *argv[])
     }
 
     /* Cleanup */
+    spritesheet_manager_shutdown(&sprite_mgr);
     effects_cleanup(&effects);
     audio_shutdown(&audio);
     engine_shutdown(&engine);
