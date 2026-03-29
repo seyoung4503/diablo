@@ -9,6 +9,9 @@ static int bsp_node_count;
 static Room gen_rooms[MAX_ROOMS];
 static int gen_room_count;
 
+/* Current level number (used by corridor width logic) */
+static int gen_level_num;
+
 /* ------------------------------------------------------------------ */
 /* BSP helpers                                                         */
 /* ------------------------------------------------------------------ */
@@ -82,6 +85,83 @@ static void bsp_split(int node_idx, int depth, int max_depth)
 }
 
 /* ------------------------------------------------------------------ */
+/* Room shape carving helpers                                          */
+/* ------------------------------------------------------------------ */
+
+typedef enum {
+    ROOM_RECTANGLE,
+    ROOM_L_SHAPED,
+    ROOM_CROSS,
+    ROOM_ROUND
+} RoomShape;
+
+static RoomShape pick_room_shape(void)
+{
+    int roll = rand() % 100;
+    if (roll < 10)      return ROOM_CROSS;    /* 10% */
+    if (roll < 25)      return ROOM_ROUND;    /* 15% */
+    if (roll < 45)      return ROOM_L_SHAPED; /* 20% */
+    return ROOM_RECTANGLE;                    /* 55% */
+}
+
+static void carve_rectangle_room(TileMap *map, int x, int y, int w, int h)
+{
+    for (int ty = y; ty < y + h; ty++)
+        for (int tx = x; tx < x + w; tx++)
+            tilemap_set_tile(map, tx, ty, TILE_STONE_FLOOR);
+}
+
+static void carve_l_shaped_room(TileMap *map, int x, int y, int w, int h)
+{
+    int half_w = w / 2 + 1;
+    int half_h = h / 2 + 1;
+    /* Vertical arm */
+    for (int ty = y; ty < y + h; ty++)
+        for (int tx = x; tx < x + half_w; tx++)
+            tilemap_set_tile(map, tx, ty, TILE_STONE_FLOOR);
+    /* Horizontal arm */
+    for (int ty = y; ty < y + half_h; ty++)
+        for (int tx = x; tx < x + w; tx++)
+            tilemap_set_tile(map, tx, ty, TILE_STONE_FLOOR);
+}
+
+static void carve_cross_room(TileMap *map, int x, int y, int w, int h)
+{
+    int arm_w = w / 3;
+    int arm_h = h / 3;
+    if (arm_w < 2) arm_w = 2;
+    if (arm_h < 2) arm_h = 2;
+    /* Horizontal bar */
+    int hx = x;
+    int hy = y + (h - arm_h) / 2;
+    for (int ty = hy; ty < hy + arm_h; ty++)
+        for (int tx = hx; tx < hx + w; tx++)
+            tilemap_set_tile(map, tx, ty, TILE_STONE_FLOOR);
+    /* Vertical bar */
+    int vx = x + (w - arm_w) / 2;
+    int vy = y;
+    for (int ty = vy; ty < vy + h; ty++)
+        for (int tx = vx; tx < vx + arm_w; tx++)
+            tilemap_set_tile(map, tx, ty, TILE_STONE_FLOOR);
+}
+
+static void carve_round_room(TileMap *map, int x, int y, int w, int h)
+{
+    float cx = x + w / 2.0f;
+    float cy = y + h / 2.0f;
+    float rx = w / 2.0f;
+    float ry = h / 2.0f;
+    for (int ty = y; ty < y + h; ty++) {
+        for (int tx = x; tx < x + w; tx++) {
+            float dx = (tx + 0.5f - cx) / rx;
+            float dy = (ty + 0.5f - cy) / ry;
+            if (dx * dx + dy * dy <= 1.0f)
+                tilemap_set_tile(map, tx, ty, TILE_STONE_FLOOR);
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* Room creation in leaf nodes                                         */
 /* ------------------------------------------------------------------ */
 
@@ -117,11 +197,21 @@ static void bsp_create_rooms(int node_idx, TileMap *map)
         node->has_room = true;
         gen_rooms[gen_room_count++] = room;
 
-        /* Carve room into tilemap */
-        for (int y = ry; y < ry + rh; y++) {
-            for (int x = rx; x < rx + rw; x++) {
-                tilemap_set_tile(map, x, y, TILE_STONE_FLOOR);
-            }
+        /* Pick a room shape and carve it */
+        RoomShape shape = pick_room_shape();
+        switch (shape) {
+        case ROOM_L_SHAPED:
+            carve_l_shaped_room(map, rx, ry, rw, rh);
+            break;
+        case ROOM_CROSS:
+            carve_cross_room(map, rx, ry, rw, rh);
+            break;
+        case ROOM_ROUND:
+            carve_round_room(map, rx, ry, rw, rh);
+            break;
+        default:
+            carve_rectangle_room(map, rx, ry, rw, rh);
+            break;
         }
         return;
     }
@@ -155,23 +245,27 @@ static bool bsp_get_room_center(int node_idx, int *cx, int *cy)
 /* Corridor carving                                                    */
 /* ------------------------------------------------------------------ */
 
-static void carve_corridor_h(TileMap *map, int x1, int x2, int y)
+static void carve_corridor_h(TileMap *map, int x1, int x2, int y, int width)
 {
     int start = MIN(x1, x2);
     int end = MAX(x1, x2);
     for (int x = start; x <= end; x++) {
-        if (tilemap_in_bounds(map, x, y))
-            tilemap_set_tile(map, x, y, TILE_STONE_FLOOR);
+        for (int w = 0; w < width; w++) {
+            if (tilemap_in_bounds(map, x, y + w))
+                tilemap_set_tile(map, x, y + w, TILE_STONE_FLOOR);
+        }
     }
 }
 
-static void carve_corridor_v(TileMap *map, int y1, int y2, int x)
+static void carve_corridor_v(TileMap *map, int y1, int y2, int x, int width)
 {
     int start = MIN(y1, y2);
     int end = MAX(y1, y2);
     for (int y = start; y <= end; y++) {
-        if (tilemap_in_bounds(map, x, y))
-            tilemap_set_tile(map, x, y, TILE_STONE_FLOOR);
+        for (int w = 0; w < width; w++) {
+            if (tilemap_in_bounds(map, x + w, y))
+                tilemap_set_tile(map, x + w, y, TILE_STONE_FLOOR);
+        }
     }
 }
 
@@ -191,13 +285,16 @@ static void bsp_connect_rooms(int node_idx, TileMap *map)
     if (!bsp_get_room_center(node->left, &lx, &ly)) return;
     if (!bsp_get_room_center(node->right, &rx, &ry)) return;
 
+    /* Wider corridors for deeper levels (9+) */
+    int corridor_width = (gen_level_num >= 9) ? 2 : 1;
+
     /* L-shaped corridor: randomly horizontal-first or vertical-first */
     if (rand() % 2 == 0) {
-        carve_corridor_h(map, lx, rx, ly);
-        carve_corridor_v(map, ly, ry, rx);
+        carve_corridor_h(map, lx, rx, ly, corridor_width);
+        carve_corridor_v(map, ly, ry, rx, corridor_width);
     } else {
-        carve_corridor_v(map, ly, ry, lx);
-        carve_corridor_h(map, lx, rx, ry);
+        carve_corridor_v(map, ly, ry, lx, corridor_width);
+        carve_corridor_h(map, lx, rx, ry, corridor_width);
     }
 }
 
@@ -250,6 +347,99 @@ static void place_doors(TileMap *map, const Room *rooms, int room_count)
 }
 
 /* ------------------------------------------------------------------ */
+/* Special room features                                               */
+/* ------------------------------------------------------------------ */
+
+static void place_special_features(DungeonLevel *level)
+{
+    if (level->room_count < 3)
+        return;
+
+    /* Water pool in one random room */
+    int pool_room = rand() % level->room_count;
+    int cx = level->rooms[pool_room].x + level->rooms[pool_room].w / 2;
+    int cy = level->rooms[pool_room].y + level->rooms[pool_room].h / 2;
+    /* 3x3 water pool */
+    for (int dy = -1; dy <= 1; dy++)
+        for (int dx = -1; dx <= 1; dx++)
+            if (tilemap_in_bounds(&level->map, cx + dx, cy + dy))
+                tilemap_set_tile(&level->map, cx + dx, cy + dy, TILE_WATER);
+
+    /* Theme-specific decorations */
+    switch (level->theme) {
+    case THEME_CATHEDRAL:
+        /* Holy water fonts in room corners */
+        for (int r = 0; r < level->room_count; r++) {
+            if (rand() % 3 != 0) continue; /* ~33% of rooms */
+            const Room *room = &level->rooms[r];
+            int corners[4][2] = {
+                { room->x + 1, room->y + 1 },
+                { room->x + room->w - 2, room->y + 1 },
+                { room->x + 1, room->y + room->h - 2 },
+                { room->x + room->w - 2, room->y + room->h - 2 },
+            };
+            int ci = rand() % 4;
+            if (tilemap_in_bounds(&level->map, corners[ci][0], corners[ci][1]))
+                tilemap_set_tile(&level->map, corners[ci][0], corners[ci][1],
+                                 TILE_WATER);
+        }
+        break;
+
+    case THEME_CATACOMBS:
+        /* Void/pit tiles scattered (1-2 per room) */
+        for (int r = 0; r < level->room_count; r++) {
+            const Room *room = &level->rooms[r];
+            int pits = 1 + rand() % 2;
+            for (int p = 0; p < pits; p++) {
+                int px = room->x + 1 + rand() % MAX(1, room->w - 2);
+                int py = room->y + 1 + rand() % MAX(1, room->h - 2);
+                /* Don't place on stairs */
+                if ((px == level->stairs_up_x && py == level->stairs_up_y) ||
+                    (px == level->stairs_down_x && py == level->stairs_down_y))
+                    continue;
+                if (tilemap_in_bounds(&level->map, px, py))
+                    tilemap_set_tile(&level->map, px, py, TILE_NONE);
+            }
+        }
+        break;
+
+    case THEME_CAVES:
+        /* Erode wall corners for irregular walls */
+        for (int r = 0; r < level->room_count; r++) {
+            const Room *room = &level->rooms[r];
+            /* Check tiles just outside each room edge */
+            for (int x = room->x - 1; x <= room->x + room->w; x++) {
+                for (int y = room->y - 1; y <= room->y + room->h; y++) {
+                    if (!tilemap_in_bounds(&level->map, x, y)) continue;
+                    if (tilemap_get_type(&level->map, x, y) != TILE_WALL)
+                        continue;
+                    /* Only erode corner-adjacent walls with ~25% chance */
+                    if (rand() % 4 == 0)
+                        tilemap_set_tile(&level->map, x, y, TILE_STONE_FLOOR);
+                }
+            }
+        }
+        break;
+
+    case THEME_HELL:
+        /* Lava pools (reuse TILE_WATER) in random rooms */
+        for (int r = 0; r < level->room_count; r++) {
+            if (rand() % 2 != 0) continue; /* ~50% of rooms */
+            const Room *room = &level->rooms[r];
+            int lx = room->x + room->w / 2;
+            int ly = room->y + room->h / 2;
+            /* 2x2 lava pool */
+            for (int dy = 0; dy <= 1; dy++)
+                for (int dx = 0; dx <= 1; dx++)
+                    if (tilemap_in_bounds(&level->map, lx + dx, ly + dy))
+                        tilemap_set_tile(&level->map, lx + dx, ly + dy,
+                                         TILE_WATER);
+        }
+        break;
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* Public API                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -286,6 +476,7 @@ void dungeon_generate_level(DungeonLevel *level, int level_num, unsigned int see
     /* Reset BSP state */
     bsp_node_count = 0;
     gen_room_count = 0;
+    gen_level_num = level_num;
 
     /* Create root BSP node with 1-tile border */
     int root = bsp_create_node(1, 1, DUNGEON_WIDTH - 2, DUNGEON_HEIGHT - 2);
@@ -308,6 +499,9 @@ void dungeon_generate_level(DungeonLevel *level, int level_num, unsigned int see
     for (int i = 0; i < gen_room_count; i++) {
         level->rooms[i] = gen_rooms[i];
     }
+
+    /* Add special room features (water pools, theme decorations) */
+    place_special_features(level);
 
     /* Place stairs */
     if (gen_room_count > 0) {
