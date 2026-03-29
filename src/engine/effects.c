@@ -45,6 +45,10 @@ void effects_init(EffectsSystem *fx)
     fx->day_night_tint = 1.0f;
     fx->flash_timer = 0.0f;
     fx->flash_duration = 0.0f;
+    fx->shake_timer = 0.0f;
+    fx->shake_duration = 0.0f;
+    fx->shake_intensity = 0.0f;
+    memset(fx->fog_visited, 0, sizeof(fx->fog_visited));
 }
 
 void effects_cleanup(EffectsSystem *fx)
@@ -69,6 +73,10 @@ void effects_update(EffectsSystem *fx, float dt, int game_hour)
         if (p->life <= 0.0f)
             p->active = false;
     }
+
+    /* Update screen shake */
+    if (fx->shake_timer > 0.0f)
+        fx->shake_timer -= dt;
 
     /* Update screen flash */
     if (fx->flash_timer > 0.0f) {
@@ -307,4 +315,100 @@ void effects_render_flash(EffectsSystem *fx, SDL_Renderer *renderer,
                            fx->flash_color.b, alpha);
     SDL_Rect r = { 0, 0, screen_w, screen_h };
     SDL_RenderFillRect(renderer, &r);
+}
+
+/* ── screen shake ───────────────────────────────────────────────────── */
+
+void effects_screen_shake(EffectsSystem *fx, float intensity, float duration)
+{
+    fx->shake_timer = duration;
+    fx->shake_duration = duration;
+    fx->shake_intensity = intensity;
+}
+
+int effects_get_shake_x(const EffectsSystem *fx)
+{
+    if (fx->shake_timer > 0.0f && fx->shake_duration > 0.0f)
+        return (int)(sinf(fx->shake_timer * 40.0f) * fx->shake_intensity *
+                     (fx->shake_timer / fx->shake_duration));
+    return 0;
+}
+
+int effects_get_shake_y(const EffectsSystem *fx)
+{
+    if (fx->shake_timer > 0.0f && fx->shake_duration > 0.0f)
+        return (int)(cosf(fx->shake_timer * 40.0f) * fx->shake_intensity *
+                     (fx->shake_timer / fx->shake_duration));
+    return 0;
+}
+
+/* ── projectiles ────────────────────────────────────────────────────── */
+
+void effects_spawn_projectile(EffectsSystem *fx, float x, float y,
+                              float tx, float ty, float speed,
+                              int damage, int source_id, SDL_Color color)
+{
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        if (fx->projectiles[i].active) continue;
+        float dx = tx - x;
+        float dy = ty - y;
+        float dist = sqrtf(dx * dx + dy * dy);
+        if (dist < 0.001f) dist = 1.0f;
+        fx->projectiles[i].x = x;
+        fx->projectiles[i].y = y;
+        fx->projectiles[i].vx = (dx / dist) * speed;
+        fx->projectiles[i].vy = (dy / dist) * speed;
+        fx->projectiles[i].life = 5.0f;
+        fx->projectiles[i].damage = damage;
+        fx->projectiles[i].source_id = source_id;
+        fx->projectiles[i].color = color;
+        fx->projectiles[i].active = true;
+        return;
+    }
+}
+
+void effects_update_projectiles(EffectsSystem *fx, float dt)
+{
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        if (!fx->projectiles[i].active) continue;
+        fx->projectiles[i].x += fx->projectiles[i].vx * dt;
+        fx->projectiles[i].y += fx->projectiles[i].vy * dt;
+        fx->projectiles[i].life -= dt;
+        if (fx->projectiles[i].life <= 0.0f)
+            fx->projectiles[i].active = false;
+    }
+}
+
+void effects_render_projectiles(EffectsSystem *fx, SDL_Renderer *renderer,
+                                int cam_x, int cam_y, int screen_cx)
+{
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        if (!fx->projectiles[i].active) continue;
+        int sx = (int)fx->projectiles[i].x - cam_x + screen_cx;
+        int sy = (int)fx->projectiles[i].y - cam_y;
+        SDL_Color c = fx->projectiles[i].color;
+        SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
+        /* Draw small filled circle (3px radius) */
+        for (int dy = -3; dy <= 3; dy++) {
+            int dx = (int)sqrtf((float)(9 - dy * dy));
+            SDL_Rect line = { sx - dx, sy + dy, dx * 2, 1 };
+            SDL_RenderFillRect(renderer, &line);
+        }
+    }
+}
+
+/* ── fog visited tiles ──────────────────────────────────────────────── */
+
+void effects_mark_visited(EffectsSystem *fx, int tx, int ty)
+{
+    if (tx >= 0 && tx < MAP_WIDTH && ty >= 0 && ty < MAP_HEIGHT)
+        fx->fog_visited[ty][tx] = true;
+}
+
+bool effects_is_visited(const EffectsSystem *fx, int tx, int ty)
+{
+    if (tx >= 0 && tx < MAP_WIDTH && ty >= 0 && ty < MAP_HEIGHT)
+        return fx->fog_visited[ty][tx];
+    return false;
 }

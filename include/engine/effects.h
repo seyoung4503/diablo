@@ -34,6 +34,26 @@ typedef struct EffectsSystem {
     float flash_timer;
     float flash_duration;
     SDL_Color flash_color;
+
+    /* Screen shake */
+    float shake_timer;
+    float shake_duration;
+    float shake_intensity;
+
+    /* Projectile system */
+#define MAX_PROJECTILES 16
+    struct {
+        float x, y;            /* world position */
+        float vx, vy;          /* velocity pixels/sec */
+        float life;
+        int damage;
+        int source_id;          /* -1 = player, >= 0 = enemy index */
+        SDL_Color color;
+        bool active;
+    } projectiles[MAX_PROJECTILES];
+
+    /* Visited tiles for fog (explored but not in light radius) */
+    bool fog_visited[MAP_HEIGHT][MAP_WIDTH];
 } EffectsSystem;
 
 void effects_init(EffectsSystem *fx);
@@ -60,5 +80,22 @@ void effects_render_day_night(EffectsSystem *fx, SDL_Renderer *renderer,
 void effects_flash(EffectsSystem *fx, SDL_Color color, float duration);
 void effects_render_flash(EffectsSystem *fx, SDL_Renderer *renderer,
                           int screen_w, int screen_h);
+
+/* Screen shake */
+void effects_screen_shake(EffectsSystem *fx, float intensity, float duration);
+int effects_get_shake_x(const EffectsSystem *fx);
+int effects_get_shake_y(const EffectsSystem *fx);
+
+/* Projectiles */
+void effects_spawn_projectile(EffectsSystem *fx, float x, float y,
+                              float tx, float ty, float speed,
+                              int damage, int source_id, SDL_Color color);
+void effects_update_projectiles(EffectsSystem *fx, float dt);
+void effects_render_projectiles(EffectsSystem *fx, SDL_Renderer *renderer,
+                                int cam_x, int cam_y, int screen_cx);
+
+/* Fog visited tiles */
+void effects_mark_visited(EffectsSystem *fx, int tx, int ty);
+bool effects_is_visited(const EffectsSystem *fx, int tx, int ty);
 
 #endif /* DIABLO_ENGINE_EFFECTS_H */
