@@ -24,6 +24,12 @@ void resource_shutdown(ResourceManager *rm);
 /* Load a texture from disk. Returns the texture index, or -1 on failure. */
 int resource_load_texture(ResourceManager *rm, const char *path);
 
+/* Load a tile texture with diamond masking (transparent outside diamond). */
+int resource_load_tile_texture(ResourceManager *rm, const char *path, int w, int h);
+
+/* Load a sprite texture with color-key background removal. */
+int resource_load_sprite_texture(ResourceManager *rm, const char *path);
+
 /* Get a texture by index. Returns NULL if the index is invalid. */
 SDL_Texture *resource_get_texture(ResourceManager *rm, int index);
 
