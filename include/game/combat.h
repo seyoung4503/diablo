@@ -27,6 +27,9 @@ CombatResult combat_enemy_attack(struct Enemy *enemy, struct Player *player,
 /* Check if two positions are within attack range */
 bool combat_in_range(int ax, int ay, int bx, int by, int range);
 
+/* Check if an enemy attack should be ranged (projectile) */
+bool combat_enemy_is_ranged(const struct Enemy *enemy);
+
 /* Process all combat for this frame (enemies attacking player) */
 void combat_update(struct EnemyManager *enemies, struct Player *player,
                    const struct Inventory *inv, float dt);

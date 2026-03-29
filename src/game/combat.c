@@ -110,6 +110,11 @@ CombatResult combat_enemy_attack(Enemy *enemy, Player *player,
     return result;
 }
 
+bool combat_enemy_is_ranged(const Enemy *enemy)
+{
+    return enemy->is_ranged;
+}
+
 void combat_update(EnemyManager *enemies, Player *player,
                    const Inventory *inv, float dt)
 {

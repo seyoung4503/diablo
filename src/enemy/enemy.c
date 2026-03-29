@@ -96,6 +96,9 @@ void enemy_spawn(EnemyManager *mgr, EnemyType type, int x, int y)
     /* Apply stats from enemy type template */
     mgr->count++;
     enemy_apply_template(e);
+
+    /* Ranged flag: enemies with attack_range > 1 use projectiles */
+    e->is_ranged = (e->attack_range > 1);
 }
 
 Enemy *enemy_at_tile(EnemyManager *mgr, int x, int y)
