@@ -15,6 +15,7 @@
 #include "game/item.h"
 #include "game/inventory.h"
 #include "game/combat.h"
+#include "game/combat_anim.h"
 #include "game/save.h"
 #include "game/stats.h"
 #include "enemy/enemy.h"
@@ -91,6 +92,9 @@ static int current_dungeon_level = 0;  /* 0 = town */
 /* Audio & Effects */
 static AudioSystem audio;
 static EffectsSystem effects;
+
+/* Combat animation system */
+static CombatAnimSystem combat_anim;
 
 /* Title screen menu */
 static int title_selection = 0;
@@ -295,6 +299,9 @@ int main(int argc, char *argv[])
 
     /* Initialize effects system */
     effects_init(&effects);
+
+    /* Initialize combat animation system */
+    combat_anim_init(&combat_anim);
 
     /* Initialize Tristram town */
     Town town;
@@ -748,42 +755,25 @@ int main(int argc, char *argv[])
                         Enemy *target_enemy = enemy_at_tile(&enemy_mgr, hover_tile_x, hover_tile_y);
                         if (target_enemy && target_enemy->alive &&
                             combat_in_range(player.tile_x, player.tile_y,
-                                            hover_tile_x, hover_tile_y, 1)) {
-                            /* Player attacks the enemy */
+                                            hover_tile_x, hover_tile_y, 1) &&
+                            combat_anim_can_act(&combat_anim)) {
+                            /* Face the enemy */
+                            int dx = target_enemy->tile_x - player.tile_x;
+                            int dy = target_enemy->tile_y - player.tile_y;
+                            if (dx > 0 && dy > 0) player.facing = DIR_SE;
+                            else if (dx > 0 && dy < 0) player.facing = DIR_NE;
+                            else if (dx < 0 && dy > 0) player.facing = DIR_SW;
+                            else if (dx < 0 && dy < 0) player.facing = DIR_NW;
+                            else if (dx > 0) player.facing = DIR_E;
+                            else if (dx < 0) player.facing = DIR_W;
+                            else if (dy > 0) player.facing = DIR_S;
+                            else player.facing = DIR_N;
+
+                            player.anim_state = ANIM_ATTACKING;
+                            combat_anim_start_attack(&combat_anim, target_enemy->id,
+                                                     MELEE_DEFAULT_TIMING);
                             audio_play_sfx(&audio, SFX_SWORD_SWING);
-                            CombatResult cr = combat_player_attack(&player, target_enemy, &inventory);
-
-                            if (cr.hit) {
-                                audio_play_sfx(&audio, SFX_HIT);
-                                /* Blood at enemy position */
-                                int esx = (int)target_enemy->world_x - (int)camera.x + SCREEN_WIDTH / 2;
-                                int esy = (int)target_enemy->world_y - (int)camera.y;
-                                effects_spawn_blood(&effects, esx, esy);
-                            }
-
-                            /* Check for level up from XP gained */
-                            if (cr.xp_gained > 0 && cr.killed) {
-                                /* Level up check — compare level before/after */
-                                /* stats_add_xp was already called in combat_player_attack */
-                            }
-
-                            /* Drop loot if killed */
-                            if (!target_enemy->alive) {
-                                audio_play_sfx(&audio, SFX_ENEMY_DIE);
-                                /* Drop gold */
-                                if (target_enemy->gold_max > 0) {
-                                    int gold_amt = target_enemy->gold_min +
-                                        rand() % (target_enemy->gold_max - target_enemy->gold_min + 1);
-                                    inventory.gold += gold_amt;
-                                }
-                                /* Chance to drop a random item (30%) */
-                                if (rand() % 100 < 30) {
-                                    Item loot = item_create_random(&item_db, 1, player.stats.level + 2);
-                                    if (loot.type != ITEM_NONE)
-                                        drop_ground_item(&loot, target_enemy->tile_x, target_enemy->tile_y);
-                                }
-                            }
-                        } else if (active_map && hover_tile_x >= 0 && hover_tile_y >= 0 &&
+                        } else if (combat_anim_can_act(&combat_anim) && active_map && hover_tile_x >= 0 && hover_tile_y >= 0 &&
                                    tilemap_in_bounds(active_map, hover_tile_x, hover_tile_y) &&
                                    tilemap_is_walkable(active_map, hover_tile_x, hover_tile_y)) {
                             /* Click-to-move: pathfind to hovered tile */
@@ -814,8 +804,9 @@ int main(int argc, char *argv[])
             if (dialogue_is_active(&dialogue))
                 dialogue_update(&dialogue, dt);
 
-            /* Update player movement */
-            player_update(&player, dt, active_map);
+            /* Update player movement (blocked during attack animation) */
+            if (combat_anim_can_act(&combat_anim))
+                player_update(&player, dt, active_map);
 
             /* Update enemies (AI + movement) */
             for (int i = 0; i < enemy_mgr.count; i++) {
@@ -850,6 +841,67 @@ int main(int argc, char *argv[])
                 psx = psx - (int)camera.x + SCREEN_WIDTH / 2;
                 psy = psy - (int)camera.y;
                 effects_spawn_levelup(&effects, psx, psy);
+            }
+
+            /* Resolve player attack damage at swing phase */
+            {
+                int cam_x_upd = (int)camera.x;
+                int cam_y_upd = (int)camera.y;
+                if (combat_anim_should_resolve_damage(&combat_anim)) {
+                    uint32_t tid = combat_anim.player_attack.target_enemy_id;
+                    Enemy *target = NULL;
+                    int target_idx = -1;
+                    for (int i = 0; i < enemy_mgr.count; i++) {
+                        if (enemy_mgr.enemies[i].id == tid && enemy_mgr.enemies[i].alive) {
+                            target = &enemy_mgr.enemies[i];
+                            target_idx = i;
+                            break;
+                        }
+                    }
+                    if (target) {
+                        CombatResult cr = combat_player_attack(&player, target, &inventory);
+                        int esx = (int)target->world_x - cam_x_upd + SCREEN_WIDTH / 2;
+                        int esy = (int)target->world_y - cam_y_upd;
+                        if (cr.hit) {
+                            audio_play_sfx(&audio, SFX_HIT);
+                            effects_spawn_blood(&effects, esx, esy);
+                            float kb_dx = (float)(target->tile_x - player.tile_x) * 2.0f;
+                            float kb_dy = (float)(target->tile_y - player.tile_y) * 2.0f;
+                            combat_anim_hit_reaction(&combat_anim, target_idx, kb_dx, kb_dy);
+                            char dmg_str[16];
+                            snprintf(dmg_str, sizeof(dmg_str), "%d", cr.damage);
+                            combat_anim_spawn_text(&combat_anim, (float)esx, (float)esy - 30,
+                                                   dmg_str, (SDL_Color){255, 220, 50, 255});
+                        } else {
+                            combat_anim_spawn_text(&combat_anim, (float)esx, (float)esy - 30,
+                                                   "MISS", (SDL_Color){180, 180, 180, 255});
+                        }
+                        if (!target->alive) {
+                            audio_play_sfx(&audio, SFX_ENEMY_DIE);
+                            combat_anim_start_death(&combat_anim, target_idx, target->id,
+                                                    (float)esx, (float)esy,
+                                                    target->tile_x, target->tile_y);
+                            if (target->gold_max > 0) {
+                                int gold_amt = target->gold_min +
+                                    rand() % (target->gold_max - target->gold_min + 1);
+                                inventory.gold += gold_amt;
+                            }
+                            if (rand() % 100 < 30) {
+                                Item loot = item_create_random(&item_db, 1, player.stats.level + 2);
+                                if (loot.type != ITEM_NONE)
+                                    drop_ground_item(&loot, target->tile_x, target->tile_y);
+                            }
+                        }
+                    }
+                }
+            }
+
+            /* Update combat animations */
+            combat_anim_update(&combat_anim, dt);
+
+            /* Reset to idle after attack finishes */
+            if (!combat_anim.player_attack.active && player.anim_state == ANIM_ATTACKING) {
+                player.anim_state = ANIM_IDLE;
             }
 
             /* Check player death */
@@ -1114,9 +1166,17 @@ int main(int argc, char *argv[])
             Enemy *e = &enemy_mgr.enemies[i];
             if (!e->alive)
                 continue;
+            if (combat_anim_is_dying(&combat_anim, i))
+                continue;
 
             int e_sx = (int)e->world_x - cam_x + (SCREEN_WIDTH / 2) - SPRITE_SIZE / 2;
             int e_sy = (int)e->world_y - cam_y - SPRITE_SIZE + TILE_HALF_H;
+
+            /* Apply hit reaction knockback offset */
+            float hit_dx = 0, hit_dy = 0;
+            combat_anim_get_hit_offset(&combat_anim, i, &hit_dx, &hit_dy);
+            e_sx += (int)hit_dx;
+            e_sy += (int)hit_dy;
 
             if (e->anim.sheet) {
                 SDL_Rect src = anim_controller_get_src_rect(&e->anim);
@@ -1219,6 +1279,10 @@ int main(int argc, char *argv[])
 
         /* Particles (blood, heal, level up) */
         effects_render_particles(&effects, engine.renderer);
+
+        /* Combat floating texts and death animations */
+        combat_anim_render_texts(&combat_anim, engine.renderer, ui.font);
+        combat_anim_render_deaths(&combat_anim, engine.renderer);
 
         /* Screen flash (damage) */
         effects_render_flash(&effects, engine.renderer, SCREEN_WIDTH, VIEWPORT_HEIGHT);
