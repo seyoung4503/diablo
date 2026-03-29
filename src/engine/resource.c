@@ -47,6 +47,23 @@ int resource_load_texture(ResourceManager *rm, const char *path)
     return idx;
 }
 
+/* Try loading PNG version first, fall back to original path */
+static SDL_Surface *load_image_prefer_png(const char *path)
+{
+    char png_path[256];
+    const char *dot = strrchr(path, '.');
+    if (dot && strcmp(dot, ".jpg") == 0) {
+        size_t base_len = (size_t)(dot - path);
+        if (base_len < sizeof(png_path) - 5) {
+            memcpy(png_path, path, base_len);
+            strcpy(png_path + base_len, ".png");
+            SDL_Surface *s = IMG_Load(png_path);
+            if (s) return s;
+        }
+    }
+    return IMG_Load(path);
+}
+
 /*
  * Apply a diamond mask to a surface: pixels outside the isometric diamond
  * shape are set to fully transparent. The diamond is defined by:
@@ -106,7 +123,7 @@ int resource_load_tile_texture(ResourceManager *rm, const char *path, int w, int
         return -1;
     }
 
-    SDL_Surface *src = IMG_Load(path);
+    SDL_Surface *src = load_image_prefer_png(path);
     if (!src) {
         fprintf(stderr, "Failed to load tile '%s': %s\n", path, IMG_GetError());
         return -1;
@@ -146,7 +163,7 @@ int resource_load_sprite_texture(ResourceManager *rm, const char *path)
         return -1;
     }
 
-    SDL_Surface *src = IMG_Load(path);
+    SDL_Surface *src = load_image_prefer_png(path);
     if (!src) {
         fprintf(stderr, "Failed to load sprite '%s': %s\n", path, IMG_GetError());
         return -1;
