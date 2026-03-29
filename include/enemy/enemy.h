@@ -29,7 +29,7 @@ typedef enum {
 } EnemyState;
 
 typedef struct Enemy {
-    int id;
+    uint32_t id;
     EnemyType type;
     char name[32];
     EnemyState state;
@@ -68,6 +68,7 @@ typedef struct Enemy {
 typedef struct EnemyManager {
     Enemy enemies[MAX_ENEMIES_PER_LEVEL];
     int count;
+    uint32_t next_id;
 } EnemyManager;
 
 /* Initialize enemy manager (clear all enemies) */

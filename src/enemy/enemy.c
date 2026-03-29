@@ -7,6 +7,7 @@ void enemy_manager_init(EnemyManager *mgr)
 {
     memset(mgr->enemies, 0, sizeof(mgr->enemies));
     mgr->count = 0;
+    mgr->next_id = 1;
 }
 
 void enemy_manager_update(EnemyManager *mgr, float dt, const struct TileMap *map)
@@ -68,7 +69,7 @@ void enemy_spawn(EnemyManager *mgr, EnemyType type, int x, int y)
     Enemy *e = &mgr->enemies[mgr->count];
     memset(e, 0, sizeof(Enemy));
 
-    e->id = mgr->count;
+    e->id = mgr->next_id++;
     e->type = type;
     e->state = ENEMY_STATE_IDLE;
     e->tile_x = x;
