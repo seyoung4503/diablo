@@ -49,7 +49,7 @@ typedef struct Dungeon {
 typedef struct DungeonTheme {
     int theme_id;
     const char *name;
-    EnemyType enemy_types[3];   /* which enemies appear */
+    EnemyType enemy_types[4];   /* which enemies appear */
     int enemy_count_min;        /* per room */
     int enemy_count_max;
     int enemy_level_bonus;      /* added to base stats */

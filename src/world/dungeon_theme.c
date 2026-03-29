@@ -1,10 +1,10 @@
 #include "world/dungeon.h"
 
 /* Theme definitions per spec:
- * Cathedral (1-4):  Fallen, Skeleton, Zombie    1-3/room
- * Catacombs (5-8):  Skeleton, Zombie, Hidden    2-4/room
- * Caves (9-12):     Scavenger, Skeleton, Hidden  2-5/room
- * Hell (13-16):     Zombie, Hidden, Skeleton     3-6/room
+ * Cathedral (1-4):  Fallen, Skeleton, Zombie           1-3/room
+ * Catacombs (5-8):  Skeleton, Zombie, Hidden, Mage     2-4/room
+ * Caves (9-12):     Scavenger, Goat Man, Acid Dog, Hidden  2-5/room
+ * Hell (13-16):     Knight, Balrog, Mage, Hidden       3-6/room
  */
 static DungeonTheme themes[THEME_COUNT];
 static bool themes_initialized = false;
@@ -16,7 +16,7 @@ void dungeon_theme_init(void)
     themes[THEME_CATHEDRAL] = (DungeonTheme){
         .theme_id = THEME_CATHEDRAL,
         .name = "Cathedral",
-        .enemy_types = { ENEMY_FALLEN, ENEMY_SKELETON, ENEMY_ZOMBIE },
+        .enemy_types = { ENEMY_FALLEN, ENEMY_SKELETON, ENEMY_ZOMBIE, ENEMY_FALLEN },
         .enemy_count_min = 1,
         .enemy_count_max = 3,
         .enemy_level_bonus = 0,
@@ -25,7 +25,7 @@ void dungeon_theme_init(void)
     themes[THEME_CATACOMBS] = (DungeonTheme){
         .theme_id = THEME_CATACOMBS,
         .name = "Catacombs",
-        .enemy_types = { ENEMY_SKELETON, ENEMY_ZOMBIE, ENEMY_HIDDEN },
+        .enemy_types = { ENEMY_SKELETON, ENEMY_ZOMBIE, ENEMY_HIDDEN, ENEMY_MAGE },
         .enemy_count_min = 2,
         .enemy_count_max = 4,
         .enemy_level_bonus = 2,
@@ -34,7 +34,7 @@ void dungeon_theme_init(void)
     themes[THEME_CAVES] = (DungeonTheme){
         .theme_id = THEME_CAVES,
         .name = "Caves",
-        .enemy_types = { ENEMY_SCAVENGER, ENEMY_SKELETON, ENEMY_HIDDEN },
+        .enemy_types = { ENEMY_SCAVENGER, ENEMY_GOAT_MAN, ENEMY_ACID_DOG, ENEMY_HIDDEN },
         .enemy_count_min = 2,
         .enemy_count_max = 5,
         .enemy_level_bonus = 4,
@@ -43,7 +43,7 @@ void dungeon_theme_init(void)
     themes[THEME_HELL] = (DungeonTheme){
         .theme_id = THEME_HELL,
         .name = "Hell",
-        .enemy_types = { ENEMY_ZOMBIE, ENEMY_HIDDEN, ENEMY_SKELETON },
+        .enemy_types = { ENEMY_KNIGHT, ENEMY_BALROG, ENEMY_MAGE, ENEMY_HIDDEN },
         .enemy_count_min = 3,
         .enemy_count_max = 6,
         .enemy_level_bonus = 8,
@@ -88,7 +88,7 @@ void dungeon_populate_enemies(DungeonLevel *level, EnemyManager *mgr)
 
         for (int e = 0; e < count; e++) {
             /* Pick a random theme-appropriate enemy type */
-            EnemyType etype = theme->enemy_types[rand() % 3];
+            EnemyType etype = theme->enemy_types[rand() % 4];
 
             /* Find a walkable position within the room */
             int attempts = 0;

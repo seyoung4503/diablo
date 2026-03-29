@@ -81,6 +81,61 @@ void enemy_defs_init(void)
         .gold_min = 10, .gold_max = 30
     };
 
+    /* Goat Man: medium melee, appears in caves */
+    templates[ENEMY_GOAT_MAN] = (EnemyTemplate){
+        .name = "Goat Man",
+        .max_hp = 30, .armor = 4,
+        .damage_min = 5, .damage_max = 12,
+        .to_hit = 40, .xp_value = 65,
+        .detection_range = 6, .attack_range = 1,
+        .attack_cooldown = 1.3f, .move_speed = 3.5f,
+        .gold_min = 5, .gold_max = 25
+    };
+
+    /* Acid Dog: fast, weak */
+    templates[ENEMY_ACID_DOG] = (EnemyTemplate){
+        .name = "Acid Dog",
+        .max_hp = 12, .armor = 1,
+        .damage_min = 3, .damage_max = 8,
+        .to_hit = 35, .xp_value = 35,
+        .detection_range = 8, .attack_range = 1,
+        .attack_cooldown = 0.8f, .move_speed = 5.0f,
+        .gold_min = 0, .gold_max = 8
+    };
+
+    /* Mage: ranged caster */
+    templates[ENEMY_MAGE] = (EnemyTemplate){
+        .name = "Dark Mage",
+        .max_hp = 18, .armor = 2,
+        .damage_min = 8, .damage_max = 15,
+        .to_hit = 50, .xp_value = 80,
+        .detection_range = 7, .attack_range = 5,
+        .attack_cooldown = 2.0f, .move_speed = 2.0f,
+        .gold_min = 10, .gold_max = 35
+    };
+
+    /* Knight: tank */
+    templates[ENEMY_KNIGHT] = (EnemyTemplate){
+        .name = "Blood Knight",
+        .max_hp = 45, .armor = 8,
+        .damage_min = 8, .damage_max = 18,
+        .to_hit = 45, .xp_value = 100,
+        .detection_range = 5, .attack_range = 1,
+        .attack_cooldown = 1.8f, .move_speed = 1.8f,
+        .gold_min = 15, .gold_max = 50
+    };
+
+    /* Balrog: boss tier */
+    templates[ENEMY_BALROG] = (EnemyTemplate){
+        .name = "Balrog",
+        .max_hp = 80, .armor = 10,
+        .damage_min = 12, .damage_max = 25,
+        .to_hit = 55, .xp_value = 200,
+        .detection_range = 8, .attack_range = 2,
+        .attack_cooldown = 2.5f, .move_speed = 2.5f,
+        .gold_min = 30, .gold_max = 100
+    };
+
     defs_initialized = true;
 }
 
