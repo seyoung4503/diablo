@@ -49,7 +49,7 @@
 #define DLG_LINE_H    16
 #define DLG_PAD        12
 
-/* Tile texture indices */
+/* Tile textures (diamond-masked) */
 static SDL_Texture *tile_textures[TILE_TYPE_COUNT];
 
 /* Hovered tile under mouse */
@@ -151,12 +151,15 @@ static void player_warp(Player *p, int tx, int ty)
     path_clear(&p->path);
 }
 
-/* NPC sprite textures */
+/* NPC sprite textures (color-keyed for transparency) */
 static SDL_Texture *tex_griswold;
 static SDL_Texture *tex_pepin;
 static SDL_Texture *tex_ogden;
 static SDL_Texture *tex_cain;
 static SDL_Texture *tex_npc_fallback;
+
+/* Player/enemy sprite texture */
+static SDL_Texture *tex_warrior;
 
 /* Get NPC sprite texture by NPC ID */
 static SDL_Texture *get_npc_texture(int npc_id)
@@ -218,13 +221,6 @@ static const char *memory_type_name(MemoryEventType t)
     };
     if (t >= 0 && t < MEM_EVENT_COUNT) return names[t];
     return "???";
-}
-
-/* Load a texture, returning NULL (not crashing) on failure */
-static SDL_Texture *load_tex(ResourceManager *rm, const char *path)
-{
-    int idx = resource_load_texture(rm, path);
-    return resource_get_texture(rm, idx);
 }
 
 /* Check if a tile is visible in the current viewport */
@@ -1091,34 +1087,70 @@ int main(int argc, char *argv[])
     Town town;
     town_init(&town);
 
-    /* Load tile textures */
-    SDL_Texture *tex_grass  = load_tex(&engine.resources, "assets/tiles/town/grass.jpg");
-    SDL_Texture *tex_dirt   = load_tex(&engine.resources, "assets/tiles/town/dirt_path.jpg");
-    SDL_Texture *tex_stone  = load_tex(&engine.resources, "assets/tiles/floor_stone.jpg");
-    SDL_Texture *tex_wall   = load_tex(&engine.resources, "assets/tiles/wall_stone.jpg");
-    SDL_Texture *tex_water  = load_tex(&engine.resources, "assets/tiles/town/water.jpg");
-    SDL_Texture *tex_tree   = load_tex(&engine.resources, "assets/tiles/town/tree.jpg");
+    /* Load tile textures with diamond masking */
+    {
+        int idx;
+        idx = resource_load_tile_texture(&engine.resources,
+                  "assets/tiles/town/grass.jpg", TILE_WIDTH, TILE_HEIGHT);
+        SDL_Texture *tex_grass = resource_get_texture(&engine.resources, idx);
 
-    tile_textures[TILE_NONE]        = tex_stone;   /* fallback */
-    tile_textures[TILE_GRASS]       = tex_grass;
-    tile_textures[TILE_DIRT]        = tex_dirt;
-    tile_textures[TILE_STONE_FLOOR] = tex_stone;
-    tile_textures[TILE_WALL]        = tex_wall;
-    tile_textures[TILE_WATER]       = tex_water;
-    tile_textures[TILE_DOOR]        = tex_stone;    /* door drawn as stone floor */
-    tile_textures[TILE_STAIRS_UP]   = tex_stone;    /* stairs up drawn as stone floor */
-    tile_textures[TILE_STAIRS_DOWN] = tex_stone;    /* stairs down drawn as stone floor */
-    tile_textures[TILE_TREE]        = tex_grass;    /* grass base under trees */
+        idx = resource_load_tile_texture(&engine.resources,
+                  "assets/tiles/town/dirt_path.jpg", TILE_WIDTH, TILE_HEIGHT);
+        SDL_Texture *tex_dirt = resource_get_texture(&engine.resources, idx);
 
-    /* Player sprite */
-    SDL_Texture *tex_warrior = load_tex(&engine.resources, "assets/sprites/player/warrior_test.jpg");
+        idx = resource_load_tile_texture(&engine.resources,
+                  "assets/tiles/floor_stone.jpg", TILE_WIDTH, TILE_HEIGHT);
+        SDL_Texture *tex_stone = resource_get_texture(&engine.resources, idx);
 
-    /* NPC sprites */
-    tex_griswold     = load_tex(&engine.resources, "assets/sprites/npcs/griswold.jpg");
-    tex_pepin        = load_tex(&engine.resources, "assets/sprites/npcs/pepin.jpg");
-    tex_ogden        = load_tex(&engine.resources, "assets/sprites/npcs/ogden.jpg");
-    tex_cain         = load_tex(&engine.resources, "assets/sprites/npcs/cain.jpg");
-    tex_npc_fallback = load_tex(&engine.resources, "assets/sprites/player/warrior_test.jpg");
+        idx = resource_load_tile_texture(&engine.resources,
+                  "assets/tiles/wall_stone.jpg", TILE_WIDTH, TILE_HEIGHT);
+        SDL_Texture *tex_wall = resource_get_texture(&engine.resources, idx);
+
+        idx = resource_load_tile_texture(&engine.resources,
+                  "assets/tiles/town/water.jpg", TILE_WIDTH, TILE_HEIGHT);
+        SDL_Texture *tex_water = resource_get_texture(&engine.resources, idx);
+
+        idx = resource_load_tile_texture(&engine.resources,
+                  "assets/tiles/town/tree.jpg", TILE_WIDTH, TILE_HEIGHT);
+        SDL_Texture *tex_tree = resource_get_texture(&engine.resources, idx);
+
+        tile_textures[TILE_NONE]        = tex_stone;
+        tile_textures[TILE_GRASS]       = tex_grass;
+        tile_textures[TILE_DIRT]        = tex_dirt;
+        tile_textures[TILE_STONE_FLOOR] = tex_stone;
+        tile_textures[TILE_WALL]        = tex_wall;
+        tile_textures[TILE_WATER]       = tex_water;
+        tile_textures[TILE_DOOR]        = tex_stone;
+        tile_textures[TILE_STAIRS_UP]   = tex_stone;
+        tile_textures[TILE_STAIRS_DOWN] = tex_stone;
+        tile_textures[TILE_TREE]        = tex_tree ? tex_tree : tex_grass;
+    }
+
+    /* Load character sprites with color-key background removal */
+    {
+        int idx;
+        idx = resource_load_sprite_texture(&engine.resources,
+                  "assets/sprites/player/warrior_test.jpg");
+        tex_warrior = resource_get_texture(&engine.resources, idx);
+
+        idx = resource_load_sprite_texture(&engine.resources,
+                  "assets/sprites/npcs/griswold.jpg");
+        tex_griswold = resource_get_texture(&engine.resources, idx);
+
+        idx = resource_load_sprite_texture(&engine.resources,
+                  "assets/sprites/npcs/pepin.jpg");
+        tex_pepin = resource_get_texture(&engine.resources, idx);
+
+        idx = resource_load_sprite_texture(&engine.resources,
+                  "assets/sprites/npcs/ogden.jpg");
+        tex_ogden = resource_get_texture(&engine.resources, idx);
+
+        idx = resource_load_sprite_texture(&engine.resources,
+                  "assets/sprites/npcs/cain.jpg");
+        tex_cain = resource_get_texture(&engine.resources, idx);
+
+        tex_npc_fallback = tex_warrior;
+    }
 
     /* Load HUD font — try several system font paths */
     const char *font_paths[] = {
@@ -1787,19 +1819,22 @@ int main(int argc, char *argv[])
                 TileType type = tilemap_get_type(render_map, tx, ty);
                 SDL_Texture *floor_tex = tile_textures[type];
 
-                /* Always draw the floor layer */
-                if (floor_tex)
+                if (floor_tex) {
+                    /* Texture-based rendering (diamond-masked) */
                     iso_draw_tile(&iso_renderer, floor_tex, tx, ty, cam_x, cam_y);
 
-                /* Elevated tiles: walls and trees get a wall block on top */
-                if (type == TILE_WALL) {
-                    if (tex_wall)
-                        iso_draw_wall(&iso_renderer, tex_wall, tx, ty, cam_x, cam_y, TILE_HEIGHT);
-                } else if (type == TILE_TREE) {
-                    /* Draw tree sprite on top of grass base */
-                    SDL_Texture *tree_overlay = tex_tree ? tex_tree : tex_wall;
-                    if (tree_overlay)
-                        iso_draw_wall(&iso_renderer, tree_overlay, tx, ty, cam_x, cam_y, TILE_HEIGHT);
+                    /* Walls and trees get an elevated block on top */
+                    if (type == TILE_WALL && tile_textures[TILE_WALL]) {
+                        iso_draw_wall(&iso_renderer, tile_textures[TILE_WALL],
+                                      tx, ty, cam_x, cam_y, TILE_HEIGHT);
+                    } else if (type == TILE_TREE && tile_textures[TILE_TREE]) {
+                        SDL_Texture *tree_tex = tile_textures[TILE_TREE];
+                        iso_draw_wall(&iso_renderer, tree_tex,
+                                      tx, ty, cam_x, cam_y, TILE_HEIGHT);
+                    }
+                } else {
+                    /* Procedural fallback when texture is missing */
+                    iso_draw_tile_by_type(&iso_renderer, type, tx, ty, cam_x, cam_y);
                 }
             }
         }
@@ -1827,7 +1862,7 @@ int main(int argc, char *argv[])
                                     cam_x, cam_y, highlight);
         }
 
-        /* Player sprite — use interpolated world position */
+        /* Player sprite */
         {
             int draw_sx, draw_sy;
             player_get_screen_pos(&player, &draw_sx, &draw_sy);
@@ -1836,6 +1871,13 @@ int main(int argc, char *argv[])
             if (tex_warrior) {
                 SDL_Rect dst = { draw_sx, draw_sy, SPRITE_SIZE, SPRITE_SIZE };
                 SDL_RenderCopy(engine.renderer, tex_warrior, NULL, &dst);
+            } else {
+                /* Procedural fallback */
+                SDL_Color player_body = { 60, 60, 120, 255 };
+                SDL_Color player_head = { 200, 170, 140, 255 };
+                iso_draw_character(&iso_renderer,
+                                   player.tile_x, player.tile_y,
+                                   cam_x, cam_y, player_body, player_head);
             }
         }
 
@@ -1849,12 +1891,16 @@ int main(int argc, char *argv[])
             int e_sy = (int)e->world_y - cam_y - SPRITE_SIZE + TILE_HALF_H;
 
             if (tex_warrior) {
-                /* Tint enemies red */
                 SDL_SetTextureColorMod(tex_warrior, 255, 80, 80);
                 SDL_Rect dst = { e_sx, e_sy, SPRITE_SIZE, SPRITE_SIZE };
                 SDL_RenderCopy(engine.renderer, tex_warrior, NULL, &dst);
-                /* Reset tint */
                 SDL_SetTextureColorMod(tex_warrior, 255, 255, 255);
+            } else {
+                SDL_Color enemy_body = { 140, 40, 40, 255 };
+                SDL_Color enemy_head = { 180, 80, 60, 255 };
+                iso_draw_character(&iso_renderer,
+                                   e->tile_x, e->tile_y,
+                                   cam_x, cam_y, enemy_body, enemy_head);
             }
 
             /* HP bar above enemy */
@@ -1892,7 +1938,6 @@ int main(int argc, char *argv[])
             if (!npc->is_alive || npc->has_left_town)
                 continue;
 
-            /* NPC world_x/world_y are isometric screen coords, same as player */
             int npc_sx = (int)npc->world_x - cam_x + (SCREEN_WIDTH / 2) - SPRITE_SIZE / 2;
             int npc_sy = (int)npc->world_y - cam_y - SPRITE_SIZE + TILE_HALF_H;
 
@@ -1900,6 +1945,13 @@ int main(int argc, char *argv[])
             if (npc_tex) {
                 SDL_Rect dst = { npc_sx, npc_sy, SPRITE_SIZE, SPRITE_SIZE };
                 SDL_RenderCopy(engine.renderer, npc_tex, NULL, &dst);
+            } else {
+                /* Procedural fallback */
+                SDL_Color npc_body = { 80, 80, 90, 255 };
+                SDL_Color npc_head = { 200, 170, 140, 255 };
+                iso_draw_character(&iso_renderer,
+                                   npc->tile_x, npc->tile_y,
+                                   cam_x, cam_y, npc_body, npc_head);
             }
 
             /* Show NPC name/title when hovering over their tile */
