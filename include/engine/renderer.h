@@ -47,4 +47,11 @@ void iso_draw_character(IsoRenderer *r, int tile_x, int tile_y,
                         int cam_x, int cam_y,
                         SDL_Color body_color, SDL_Color head_color);
 
+/* Draw an animated sprite frame at a world position */
+void iso_draw_animated_sprite(IsoRenderer *r, SDL_Texture *tex,
+                              SDL_Rect src_rect,
+                              int world_x, int world_y,
+                              int cam_x, int cam_y,
+                              int dest_w, int dest_h);
+
 #endif /* DIABLO_ENGINE_RENDERER_H */

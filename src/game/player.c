@@ -28,6 +28,8 @@ void player_init(Player *player, int start_x, int start_y)
 
     path_clear(&player->path);
     stats_init(&player->stats);
+
+    memset(&player->anim, 0, sizeof(player->anim));
 }
 
 /* Start moving toward the next waypoint on the path */
@@ -58,6 +60,8 @@ void player_update(Player *player, float dt, const struct TileMap *map)
 
     if (!player->moving) {
         player->anim_state = ANIM_IDLE;
+        anim_controller_set_state(&player->anim, player->anim_state, player->facing);
+        anim_controller_update(&player->anim, dt);
         return;
     }
 
@@ -92,6 +96,9 @@ void player_update(Player *player, float dt, const struct TileMap *map)
         player->world_x = from_sx + (to_sx - from_sx) * t;
         player->world_y = from_sy + (to_sy - from_sy) * t;
     }
+
+    anim_controller_set_state(&player->anim, player->anim_state, player->facing);
+    anim_controller_update(&player->anim, dt);
 }
 
 void player_move_to(Player *player, const struct TileMap *map,

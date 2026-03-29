@@ -2,6 +2,7 @@
 #define DIABLO_GAME_PLAYER_H
 
 #include "common.h"
+#include "engine/animation.h"
 #include "game/stats.h"
 #include "world/pathfinding.h"
 
@@ -37,6 +38,9 @@ typedef struct Player {
 
     /* Movement speed (tiles per second) */
     float move_speed;
+
+    /* Animation */
+    AnimController anim;
 } Player;
 
 /* Initialize player at starting tile position */
