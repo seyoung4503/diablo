@@ -387,6 +387,25 @@ void iso_draw_tile_by_type(IsoRenderer *r, TileType type,
 }
 
 /*
+ * Draw an animated sprite frame at a world position.
+ */
+void iso_draw_animated_sprite(IsoRenderer *r, SDL_Texture *tex,
+                              SDL_Rect src_rect,
+                              int world_x, int world_y,
+                              int cam_x, int cam_y,
+                              int dest_w, int dest_h)
+{
+    if (!tex) return;
+    SDL_Rect dst = {
+        world_x - dest_w / 2 - cam_x + r->camera_offset_x,
+        world_y - dest_h + TILE_HALF_H + 8 - cam_y,
+        dest_w,
+        dest_h
+    };
+    SDL_RenderCopy(r->sdl_renderer, tex, &src_rect, &dst);
+}
+
+/*
  * Draw a simple humanoid character placeholder on a tile.
  */
 void iso_draw_character(IsoRenderer *r, int tile_x, int tile_y,
