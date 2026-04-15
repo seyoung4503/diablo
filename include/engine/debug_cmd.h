@@ -29,6 +29,8 @@ typedef struct DebugCmdAdapter {
     int wait_frames;          /* countdown, 0 = ready */
     bool response_pending;    /* write response after next render */
     char response_text[8192]; /* pre-formatted response */
+    /* Step mode: -1 = realtime, 0 = paused, >0 = stepping N frames */
+    int step_frames;
 } DebugCmdAdapter;
 
 /* ---- Game context (passed each frame) ---- */
@@ -75,6 +77,13 @@ void debug_cmd_init(DebugCmdAdapter *adapter, bool enabled);
  * Parses commands, executes simple ones, sets output flags for complex ones. */
 void debug_cmd_poll(DebugCmdAdapter *adapter, DebugCmdContext *ctx,
                     DebugCmdOutput *output);
+
+/* Check if game logic should advance this frame.
+ * Returns true in realtime mode or when step_frames > 0. */
+bool debug_cmd_should_step(const DebugCmdAdapter *adapter);
+
+/* Notify that one frame of game logic was executed. Decrements step counter. */
+void debug_cmd_frame_done(DebugCmdAdapter *adapter, DebugCmdContext *ctx);
 
 /* Write pending response to file + auto-screenshot.
  * Call after rendering, before SDL_RenderPresent. */

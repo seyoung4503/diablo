@@ -1000,7 +1000,7 @@ int main(int argc, char *argv[])
         }
 
         /* ---- UPDATE (gameplay scenes only) ---- */
-        if (in_gameplay && !player_dead) {
+        if (in_gameplay && !player_dead && debug_cmd_should_step(&cmd_adapter)) {
             /* Hitstop: freeze movement/combat/AI but keep effects ticking */
             bool hitstop_active = combat_anim_in_hitstop(&combat_anim);
             if (hitstop_active) {
@@ -1306,6 +1306,22 @@ int main(int argc, char *argv[])
 
             /* Update active_map pointer after possible scene transitions */
             active_map = (current_scene == SCENE_TOWN) ? &town.map : &current_dungeon.map;
+
+            /* Notify step adapter that a frame of logic ran */
+            if (cmd_adapter.active) {
+                DebugCmdContext step_ctx = {
+                    .player = &player, .camera = &camera,
+                    .enemies = &enemy_mgr, .game = &game,
+                    .npcs = &npc_mgr, .inventory = &inventory,
+                    .active_map = active_map, .sprites = &sprite_mgr,
+                    .resources = &engine.resources,
+                    .renderer = engine.renderer, .ui = &ui,
+                    .scene_type = (int)current_scene,
+                    .dungeon_level = current_dungeon_level,
+                    .fps = engine.fps,
+                };
+                debug_cmd_frame_done(&cmd_adapter, &step_ctx);
+            }
         }
 
         /* Update effects (always, for particle fade-out even on menus) */

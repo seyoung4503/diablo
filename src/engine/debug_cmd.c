@@ -257,6 +257,9 @@ static void cmd_help(DebugCmdAdapter *a)
     resp_append("  equip <slot>       - Equip item from slot\n");
     resp_append("  spell <0-3>        - Select spell (0=none 1=fire 2=heal 3=lightning)\n");
     resp_append("  enter              - Go to stairs and enter\n");
+    resp_append("  step [N]           - Advance N frames (default 1)\n");
+    resp_append("  play               - Switch to real-time mode\n");
+    resp_append("  pause              - Switch to step mode (paused)\n");
     resp_append("  help               - Show this help\n");
 }
 
@@ -416,11 +419,17 @@ static void process_line(DebugCmdAdapter *adapter, const char *line,
     else if (strcasecmp(cmd, "wait") == 0) {
         int frames = a1[0] ? atoi(a1) : 60;
         if (frames < 1) frames = 1;
-        if (frames > 600) frames = 600;
-        adapter->wait_frames = frames;
-        resp_append("[OK] Waiting %d frames...\n", frames);
-        /* Response will be written after wait expires */
-        return; /* don't set response_pending yet */
+        if (frames > 3600) frames = 3600;
+        if (adapter->step_frames >= 0) {
+            /* Step mode: wait = step (advance N frames) */
+            adapter->step_frames = frames;
+            resp_append("[OK] Stepping %d frames...\n", frames);
+        } else {
+            /* Real-time mode: just wait */
+            adapter->wait_frames = frames;
+            resp_append("[OK] Waiting %d frames...\n", frames);
+        }
+        return; /* response after stepping/waiting finishes */
     }
     else if (strcasecmp(cmd, "screenshot") == 0) {
         output->screenshot_requested = true;
@@ -457,6 +466,25 @@ static void process_line(DebugCmdAdapter *adapter, const char *line,
     else if (strcasecmp(cmd, "enter") == 0) {
         cmd_enter(ctx, output);
     }
+    else if (strcasecmp(cmd, "step") == 0) {
+        int n = a1[0] ? atoi(a1) : 1;
+        if (n < 1) n = 1;
+        if (n > 3600) n = 3600;
+        adapter->step_frames = n;
+        resp_append("[OK] Stepping %d frames...\n", n);
+        /* Response comes after stepping finishes */
+        return;
+    }
+    else if (strcasecmp(cmd, "play") == 0) {
+        adapter->step_frames = -1;
+        resp_append("[OK] Switched to real-time mode\n");
+        resp_player(ctx);
+    }
+    else if (strcasecmp(cmd, "pause") == 0) {
+        adapter->step_frames = 0;
+        resp_append("[OK] Paused (step mode). Use 'step N' to advance.\n");
+        resp_player(ctx);
+    }
     else {
         resp_append("[ERROR] Unknown command: %s\n", cmd);
         resp_append("Type 'help' for available commands.\n");
@@ -490,6 +518,9 @@ void debug_cmd_init(DebugCmdAdapter *adapter, bool enabled)
         return;
     }
 
+    /* Start paused in step mode */
+    adapter->step_frames = 0;
+
     /* Open RDWR + NONBLOCK: keeps pipe open, never blocks, never EOF */
     adapter->pipe_fd = open(CMD_PIPE_PATH, O_RDWR | O_NONBLOCK);
     if (adapter->pipe_fd == -1) {
@@ -510,18 +541,20 @@ void debug_cmd_poll(DebugCmdAdapter *adapter, DebugCmdContext *ctx,
     /* Clear output flags */
     memset(output, 0, sizeof(*output));
 
-    /* Handle wait countdown */
+    /* Don't process new commands while stepping or waiting */
+    if (adapter->step_frames > 0) return;
+
+    /* Handle wait countdown (real-time mode only) */
     if (adapter->wait_frames > 0) {
         adapter->wait_frames--;
         if (adapter->wait_frames == 0) {
-            /* Wait done — append final state and trigger response */
             resp_append("...wait complete.\n");
             resp_player(ctx);
             resp_scene(ctx);
             resp_enemies(ctx);
             adapter->response_pending = true;
         }
-        return; /* don't process new commands while waiting */
+        return;
     }
 
     /* Read from pipe (non-blocking) */
@@ -565,6 +598,28 @@ void debug_cmd_flush_response(DebugCmdAdapter *adapter, DebugCmdContext *ctx)
                         CMD_SCREENSHOT_PATH);
 
     fprintf(stderr, "[CMD] Response written to %s\n", CMD_RESPONSE_PATH);
+}
+
+bool debug_cmd_should_step(const DebugCmdAdapter *adapter)
+{
+    if (!adapter->active) return true; /* no adapter = normal gameplay */
+    return adapter->step_frames != 0;  /* -1 (realtime) or >0 (stepping) */
+}
+
+void debug_cmd_frame_done(DebugCmdAdapter *adapter, DebugCmdContext *ctx)
+{
+    if (!adapter->active) return;
+    if (adapter->step_frames <= 0) return; /* realtime or already paused */
+
+    adapter->step_frames--;
+    if (adapter->step_frames == 0) {
+        /* Step sequence complete — build state response */
+        resp_append("...step complete.\n");
+        resp_player(ctx);
+        resp_scene(ctx);
+        resp_enemies(ctx);
+        adapter->response_pending = true;
+    }
 }
 
 void debug_cmd_shutdown(DebugCmdAdapter *adapter)
