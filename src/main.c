@@ -280,10 +280,6 @@ static void reset_game_state(Game *game, Player *player, Town *town,
         inventory_add_item(&inventory, &hp_pot);
     }
 
-    /* Spawn enemies near cathedral entrance */
-    enemy_spawn_group(&enemy_mgr, ENEMY_FALLEN, 28, 8, 3, &town->map);
-    enemy_spawn_group(&enemy_mgr, ENEMY_SKELETON, 30, 10, 2, &town->map);
-
     /* Spell system */
     spellbook_init(&spellbook);
     active_spell = SPELL_NONE;
@@ -501,6 +497,11 @@ int main(int argc, char *argv[])
         audio_play_music(&audio, MUSIC_TITLE);
     }
 
+    /* Re-bind sprite sheet after reset (reset_game_state clears player.anim) */
+    if (warrior_sheet_id >= 0) {
+        anim_controller_init(&player.anim, spritesheet_get(&sprite_mgr, warrior_sheet_id));
+    }
+
     /* ---- Game loop ---- */
     int frame_counter = 0;
     while (engine.running) {
@@ -618,6 +619,8 @@ int main(int argc, char *argv[])
                         if (action == 0) {
                             /* New Game */
                             reset_game_state(&game, &player, &town, &camera);
+                            if (warrior_sheet_id >= 0)
+                                anim_controller_init(&player.anim, spritesheet_get(&sprite_mgr, warrior_sheet_id));
                             current_scene = SCENE_TOWN;
                             current_dungeon_level = 0;
                             audio_play_music(&audio, MUSIC_TOWN);
@@ -625,6 +628,8 @@ int main(int argc, char *argv[])
                         } else if (action == 1) {
                             /* Continue (load save) */
                             reset_game_state(&game, &player, &town, &camera);
+                            if (warrior_sheet_id >= 0)
+                                anim_controller_init(&player.anim, spritesheet_get(&sprite_mgr, warrior_sheet_id));
                             SaveData save_data;
                             if (load_game(SAVE_FILE_PATH, &save_data)) {
                                 int loaded_scene = 0, loaded_dlevel = 0;
@@ -648,8 +653,6 @@ int main(int argc, char *argv[])
                                     current_scene = SCENE_TOWN;
                                     current_dungeon_level = 0;
                                     enemy_manager_init(&enemy_mgr);
-                                    enemy_spawn_group(&enemy_mgr, ENEMY_FALLEN, 28, 8, 3, &town.map);
-                                    enemy_spawn_group(&enemy_mgr, ENEMY_SKELETON, 30, 10, 2, &town.map);
                                     effects.fog_enabled = false;
                                     audio_play_music(&audio, MUSIC_TOWN);
                                 }
@@ -691,6 +694,8 @@ int main(int argc, char *argv[])
                         if (action == 0) {
                             /* Load Save */
                             reset_game_state(&game, &player, &town, &camera);
+                            if (warrior_sheet_id >= 0)
+                                anim_controller_init(&player.anim, spritesheet_get(&sprite_mgr, warrior_sheet_id));
                             SaveData save_data;
                             if (load_game(SAVE_FILE_PATH, &save_data)) {
                                 int loaded_scene = 0, loaded_dlevel = 0;
@@ -712,8 +717,6 @@ int main(int argc, char *argv[])
                                     current_scene = SCENE_TOWN;
                                     current_dungeon_level = 0;
                                     enemy_manager_init(&enemy_mgr);
-                                    enemy_spawn_group(&enemy_mgr, ENEMY_FALLEN, 28, 8, 3, &town.map);
-                                    enemy_spawn_group(&enemy_mgr, ENEMY_SKELETON, 30, 10, 2, &town.map);
                                     effects.fog_enabled = false;
                                     audio_play_music(&audio, MUSIC_TOWN);
                                 }
@@ -1244,8 +1247,6 @@ int main(int argc, char *argv[])
                         current_scene = SCENE_TOWN;
                         current_dungeon_level = 0;
                         enemy_manager_init(&enemy_mgr);
-                        enemy_spawn_group(&enemy_mgr, ENEMY_FALLEN, 28, 8, 3, &town.map);
-                        enemy_spawn_group(&enemy_mgr, ENEMY_SKELETON, 30, 10, 2, &town.map);
                         player_warp(&player, 32, 9);  /* cathedral entrance */
                         camera_center_on_tile(&camera, player.tile_x, player.tile_y);
                         camera.x = camera.target_x;
@@ -1445,6 +1446,13 @@ int main(int argc, char *argv[])
                                     cam_x, cam_y, highlight);
         }
 
+        /* Player tile highlight (green) */
+        {
+            SDL_Color player_hl = { 0, 200, 0, 80 };
+            iso_draw_tile_highlight(&iso_renderer, player.tile_x, player.tile_y,
+                                    cam_x, cam_y, player_hl);
+        }
+
         /* Player sprite — 3-tier: animated sheet > static texture > procedural */
         {
             int draw_sx, draw_sy;
@@ -1485,6 +1493,13 @@ int main(int argc, char *argv[])
             combat_anim_get_hit_offset(&combat_anim, i, &hit_dx, &hit_dy);
             e_sx += (int)hit_dx;
             e_sy += (int)hit_dy;
+
+            /* Enemy tile highlight (red) */
+            {
+                SDL_Color enemy_hl = { 200, 0, 0, 80 };
+                iso_draw_tile_highlight(&iso_renderer, e->tile_x, e->tile_y,
+                                        cam_x, cam_y, enemy_hl);
+            }
 
             /* Color based on variant */
             Uint8 tint_r = 255, tint_g = 80, tint_b = 80;
@@ -1562,6 +1577,13 @@ int main(int argc, char *argv[])
             int npc_sx = (int)npc->world_x - cam_x + (SCREEN_WIDTH / 2) - SPRITE_SIZE / 2;
             int npc_sy = (int)npc->world_y - cam_y - SPRITE_SIZE + TILE_HALF_H;
 
+            /* NPC tile highlight (blue) */
+            {
+                SDL_Color npc_hl = { 0, 100, 200, 80 };
+                iso_draw_tile_highlight(&iso_renderer, npc->tile_x, npc->tile_y,
+                                        cam_x, cam_y, npc_hl);
+            }
+
             SDL_Texture *npc_tex = get_npc_texture(npc->id);
             if (npc_tex) {
                 SDL_Rect dst = { npc_sx, npc_sy, SPRITE_SIZE, SPRITE_SIZE };
@@ -1575,12 +1597,17 @@ int main(int argc, char *argv[])
                                    cam_x, cam_y, npc_body, npc_head);
             }
 
-            /* Show NPC name/title when hovering over their tile */
-            if (hover_tile_x == npc->tile_x && hover_tile_y == npc->tile_y) {
+            /* Always show NPC name */
+            {
                 char npc_label[MAX_NPC_NAME + MAX_NPC_TITLE + 8];
-                snprintf(npc_label, sizeof(npc_label), "%s - %s", npc->name, npc->title);
-                int label_x = npc_sx + SPRITE_SIZE / 2 - 40;
-                int label_y = npc_sy - 14;
+                snprintf(npc_label, sizeof(npc_label), "%s", npc->name);
+                int label_x = npc_sx + SPRITE_SIZE / 2 - 30;
+                int label_y = npc_sy - 4;
+                /* Dark background for readability */
+                SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+                SDL_Rect name_bg = { label_x - 2, label_y - 1, 64, 14 };
+                SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 160);
+                SDL_RenderFillRect(engine.renderer, &name_bg);
                 ui_draw_text(&ui, npc_label, label_x, label_y,
                              (SDL_Color){ 255, 220, 100, 255 });
             }

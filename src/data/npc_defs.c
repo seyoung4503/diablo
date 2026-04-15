@@ -2,6 +2,7 @@
 #include "npc/npc.h"
 #include "npc/npc_schedule.h"
 #include "world/town.h"
+#include "common.h"
 
 /* Helper: set Big Five personality traits */
 static void set_traits(NPCPersonality *p,
@@ -96,6 +97,12 @@ void npc_defs_load(NPCManager *mgr, const Town *town)
         set_values(&npc->personality, 0.3f, 0.2f, 0.7f, 0.5f, 0.6f);
         npc->mood = 0.2f;
         npc->move_speed = 2.5f;
+        npc->tile_x = 20;  /* offset from tavern center */
+        npc->tile_y = 8;
+        int sx, sy;
+        iso_to_screen(npc->tile_x, npc->tile_y, &sx, &sy);
+        npc->world_x = (float)sx;
+        npc->world_y = (float)sy;
     }
 
     /* 4: Deckard Cain — Scholar */
@@ -127,6 +134,12 @@ void npc_defs_load(NPCManager *mgr, const Town *town)
         npc->mood = -0.3f;
         npc->stress = 0.7f;
         npc->move_speed = 2.0f;
+        npc->tile_x = 18;  /* offset from tavern center */
+        npc->tile_y = 9;
+        int sx2, sy2;
+        iso_to_screen(npc->tile_x, npc->tile_y, &sx2, &sy2);
+        npc->world_x = (float)sx2;
+        npc->world_y = (float)sy2;
     }
 
     /* 7: Wirt — Young Merchant */
