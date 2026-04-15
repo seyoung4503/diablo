@@ -33,3 +33,4 @@ assets/generated/
 # Debug
 core
 *.dSYM/
+debug/

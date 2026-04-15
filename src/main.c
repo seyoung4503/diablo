@@ -35,6 +35,7 @@
 #include "story/story_arc.h"
 #include "data/npc_defs.h"
 #include "ui_screens.h"
+#include "engine/debug.h"
 #include <string.h>
 
 /* Camera scroll speed in pixels per second */
@@ -59,6 +60,8 @@ static RelationshipGraph rel_graph;
 static MemorySystem mem_system;
 static EventQueue event_queue;
 static bool show_debug = false;
+static DebugAnimViewer debug_viewer;
+static bool debug_screenshot_pending = false;
 static int prev_game_hour = -1;
 
 /* Dialogue and quest system state */
@@ -297,8 +300,21 @@ static void reset_game_state(Game *game, Player *player, Town *town,
 
 int main(int argc, char *argv[])
 {
-    (void)argc;
-    (void)argv;
+    /* Parse debug CLI flags */
+    int debug_auto_screenshot_frame = -1; /* capture after N frames, -1 = off */
+    bool debug_auto_dump = false;
+    bool debug_auto_start = false; /* skip title, go straight to gameplay */
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--screenshot") == 0) {
+            debug_auto_screenshot_frame = 30;
+        } else if (strcmp(argv[i], "--screenshot-frame") == 0 && i + 1 < argc) {
+            debug_auto_screenshot_frame = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--dump") == 0) {
+            debug_auto_dump = true;
+        } else if (strcmp(argv[i], "--autostart") == 0) {
+            debug_auto_start = true;
+        }
+    }
 
     /* Core systems */
     Engine engine;
@@ -454,6 +470,7 @@ int main(int argc, char *argv[])
     inventory_init(&inventory);
     enemy_manager_init(&enemy_mgr);
     spritesheet_manager_init(&sprite_mgr);
+    debug_anim_viewer_init(&debug_viewer);
 
     /* Try to load sprite sheets (graceful — game works without them) */
     int warrior_sheet_id = spritesheet_load(&sprite_mgr, engine.renderer,
@@ -464,15 +481,25 @@ int main(int argc, char *argv[])
         anim_controller_init(&player.anim, spritesheet_get(&sprite_mgr, warrior_sheet_id));
     }
 
-    /* Start at title screen */
-    current_scene = SCENE_TITLE;
-    title_selection = 0;
-    audio_play_music(&audio, MUSIC_TITLE);
+    /* Start at title screen (or auto-start for debugging) */
+    if (debug_auto_start) {
+        reset_game_state(&game, &player, &town, &camera);
+        current_scene = SCENE_TOWN;
+        current_dungeon_level = 0;
+        audio_play_music(&audio, MUSIC_TOWN);
+        effects.fog_enabled = false;
+    } else {
+        current_scene = SCENE_TITLE;
+        title_selection = 0;
+        audio_play_music(&audio, MUSIC_TITLE);
+    }
 
     /* ---- Game loop ---- */
+    int frame_counter = 0;
     while (engine.running) {
         engine_begin_frame(&engine);
         float dt = engine.delta_time;
+        frame_counter++;
 
         bool in_gameplay = (current_scene == SCENE_TOWN || current_scene == SCENE_DUNGEON);
         const TileMap *active_map = NULL;
@@ -726,6 +753,15 @@ int main(int argc, char *argv[])
                     break;  /* Consume all keys during dialogue */
                 }
 
+                /* Debug animation viewer consumes input when active */
+                if (debug_viewer.active) {
+                    if (key == SDLK_RETURN || key == SDLK_p)
+                        debug_anim_viewer_capture(&debug_viewer, engine.renderer,
+                                                  &ui, &sprite_mgr);
+                    debug_anim_viewer_handle_key(&debug_viewer, key, &sprite_mgr);
+                    break;
+                }
+
                 /* Normal key bindings (not in dialogue) */
                 if (key == SDLK_q)
                     show_quest_log = !show_quest_log;
@@ -775,6 +811,16 @@ int main(int argc, char *argv[])
                 if (key == SDLK_F7) {
                     active_spell = (active_spell == SPELL_LIGHTNING) ? SPELL_NONE : SPELL_LIGHTNING;
                 }
+
+                /* Debug hotkeys */
+                if (key == SDLK_F9)
+                    debug_screenshot_pending = true;
+                if (key == SDLK_F10)
+                    debug_state_dump(&player, &game, &enemy_mgr, &sprite_mgr,
+                                     &engine.resources, (int)current_scene,
+                                     current_dungeon_level);
+                if (key == SDLK_F11)
+                    debug_viewer.active = !debug_viewer.active;
                 break;
             }
 
@@ -1206,9 +1252,25 @@ int main(int argc, char *argv[])
 
         /* ---- Render ---- */
 
+        /* Debug animation viewer (fullscreen, replaces normal scene) */
+        if (debug_viewer.active) {
+            debug_anim_viewer_update(&debug_viewer, engine.delta_time);
+            debug_anim_viewer_render(&debug_viewer, engine.renderer, &ui, &sprite_mgr);
+            if (debug_screenshot_pending) {
+                debug_screenshot(engine.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+                debug_screenshot_pending = false;
+            }
+            engine_end_frame(&engine);
+            continue;
+        }
+
         if (current_scene == SCENE_TITLE) {
             /* Title screen */
             draw_title_screen(&ui, engine.renderer, title_selection);
+            /* Auto screenshot from CLI */
+            if (debug_auto_screenshot_frame >= 0 && frame_counter == debug_auto_screenshot_frame) {
+                debug_screenshot(engine.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+            }
             engine_end_frame(&engine);
             continue;
         }
@@ -1477,9 +1539,12 @@ int main(int argc, char *argv[])
         if (show_inventory)
             draw_inventory_screen(&ui, engine.renderer, &inventory);
 
-        /* F1 Debug overlay — NPC debug is town only */
-        if (show_debug && render_scene == SCENE_TOWN)
-            draw_debug_overlay(&ui, engine.renderer, &npc_mgr, &rel_graph, &mem_system, hover_tile_x, hover_tile_y);
+        /* F1 Debug overlay — NPC debug (right side, town only) + entity debug (left side, all scenes) */
+        if (show_debug) {
+            if (render_scene == SCENE_TOWN)
+                draw_debug_overlay(&ui, engine.renderer, &npc_mgr, &rel_graph, &mem_system, hover_tile_x, hover_tile_y);
+            debug_draw_overlay(&ui, engine.renderer, &player, &enemy_mgr, engine.fps, (int)render_scene);
+        }
 
         SDL_RenderSetClipRect(engine.renderer, NULL);
 
@@ -1533,6 +1598,22 @@ int main(int argc, char *argv[])
 
         if (current_scene == SCENE_DEATH)
             draw_death_screen(&ui, engine.renderer, death_selection);
+
+        /* Debug screenshot capture (must be before SDL_RenderPresent) */
+        if (debug_screenshot_pending) {
+            debug_screenshot(engine.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+            debug_screenshot_pending = false;
+        }
+
+        /* Auto screenshot/dump from CLI flags */
+        if (debug_auto_screenshot_frame >= 0 && frame_counter == debug_auto_screenshot_frame) {
+            debug_screenshot(engine.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+            if (debug_auto_dump) {
+                debug_state_dump(&player, &game, &enemy_mgr, &sprite_mgr,
+                                 &engine.resources, (int)current_scene,
+                                 current_dungeon_level);
+            }
+        }
 
         engine_end_frame(&engine);
     }
