@@ -36,6 +36,7 @@
 #include "data/npc_defs.h"
 #include "ui_screens.h"
 #include "engine/debug.h"
+#include "engine/debug_cmd.h"
 #include <string.h>
 
 /* Camera scroll speed in pixels per second */
@@ -62,6 +63,8 @@ static EventQueue event_queue;
 static bool show_debug = false;
 static DebugAnimViewer debug_viewer;
 static bool debug_screenshot_pending = false;
+static DebugCmdAdapter cmd_adapter;
+static DebugCmdOutput cmd_output;
 static int prev_game_hour = -1;
 
 /* Dialogue and quest system state */
@@ -304,6 +307,7 @@ int main(int argc, char *argv[])
     int debug_auto_screenshot_frame = -1; /* capture after N frames, -1 = off */
     bool debug_auto_dump = false;
     bool debug_auto_start = false; /* skip title, go straight to gameplay */
+    bool debug_remote = false;     /* enable CLI remote control pipe */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screenshot") == 0) {
             debug_auto_screenshot_frame = 30;
@@ -313,6 +317,8 @@ int main(int argc, char *argv[])
             debug_auto_dump = true;
         } else if (strcmp(argv[i], "--autostart") == 0) {
             debug_auto_start = true;
+        } else if (strcmp(argv[i], "--remote") == 0) {
+            debug_remote = true;
         }
     }
 
@@ -471,6 +477,7 @@ int main(int argc, char *argv[])
     enemy_manager_init(&enemy_mgr);
     spritesheet_manager_init(&sprite_mgr);
     debug_anim_viewer_init(&debug_viewer);
+    debug_cmd_init(&cmd_adapter, debug_remote);
 
     /* Try to load sprite sheets (graceful — game works without them) */
     int warrior_sheet_id = spritesheet_load(&sprite_mgr, engine.renderer,
@@ -505,6 +512,71 @@ int main(int argc, char *argv[])
         const TileMap *active_map = NULL;
         if (in_gameplay)
             active_map = (current_scene == SCENE_TOWN) ? &town.map : &current_dungeon.map;
+
+        /* Remote command adapter poll */
+        if (cmd_adapter.active && in_gameplay) {
+            DebugCmdContext cmd_ctx = {
+                .player = &player, .camera = &camera,
+                .enemies = &enemy_mgr, .game = &game,
+                .npcs = &npc_mgr, .inventory = &inventory,
+                .active_map = active_map, .sprites = &sprite_mgr,
+                .resources = &engine.resources,
+                .renderer = engine.renderer, .ui = &ui,
+                .scene_type = (int)current_scene,
+                .dungeon_level = current_dungeon_level,
+                .fps = engine.fps,
+            };
+            debug_cmd_poll(&cmd_adapter, &cmd_ctx, &cmd_output);
+
+            /* Handle output flags */
+            if (cmd_output.attack_requested) {
+                Enemy *target = enemy_at_tile(&enemy_mgr,
+                                              cmd_output.attack_x, cmd_output.attack_y);
+                if (target && target->alive &&
+                    combat_in_range(player.tile_x, player.tile_y,
+                                    cmd_output.attack_x, cmd_output.attack_y, 1) &&
+                    combat_anim_can_act(&combat_anim)) {
+                    int dx = target->tile_x - player.tile_x;
+                    int dy = target->tile_y - player.tile_y;
+                    if (dx > 0 && dy > 0)      player.facing = DIR_SE;
+                    else if (dx > 0 && dy < 0)  player.facing = DIR_NE;
+                    else if (dx < 0 && dy > 0)  player.facing = DIR_SW;
+                    else if (dx < 0 && dy < 0)  player.facing = DIR_NW;
+                    else if (dx > 0)             player.facing = DIR_E;
+                    else if (dx < 0)             player.facing = DIR_W;
+                    else if (dy > 0)             player.facing = DIR_S;
+                    else                         player.facing = DIR_N;
+                    player.anim_state = ANIM_ATTACKING;
+                    combat_anim_start_attack(&combat_anim, target->id,
+                                             MELEE_DEFAULT_TIMING);
+                    audio_play_sfx(&audio, SFX_SWORD_SWING);
+                }
+            }
+            if (cmd_output.interact_requested && current_scene == SCENE_TOWN) {
+                NPC *npc = npc_manager_at_tile(&npc_mgr,
+                                               cmd_output.interact_x, cmd_output.interact_y);
+                if (npc) {
+                    dialogue_start(&dialogue, npc->id);
+                }
+            }
+            if (cmd_output.use_item_requested) {
+                int slot = cmd_output.use_item_slot;
+                if (slot >= 0 && slot < INVENTORY_SIZE)
+                    inventory_use_item(&inventory, slot, &player.stats);
+                else if (slot < 0)
+                    inventory_equip(&inventory, -(slot + 1));
+            }
+            if (cmd_output.select_spell) {
+                active_spell = cmd_output.spell_id;
+            }
+            if (cmd_output.screenshot_requested)
+                debug_screenshot_pending = true;
+            if (cmd_output.dump_requested) {
+                debug_state_dump(&player, &game, &enemy_mgr, &sprite_mgr,
+                                 &engine.resources, (int)current_scene,
+                                 current_dungeon_level);
+            }
+        }
 
         bool in_dialogue = in_gameplay && dialogue_is_active(&dialogue);
 
@@ -1605,6 +1677,22 @@ int main(int argc, char *argv[])
             debug_screenshot_pending = false;
         }
 
+        /* Remote command response flush (after rendering, before present) */
+        if (cmd_adapter.active) {
+            DebugCmdContext cmd_ctx = {
+                .player = &player, .camera = &camera,
+                .enemies = &enemy_mgr, .game = &game,
+                .npcs = &npc_mgr, .inventory = &inventory,
+                .active_map = active_map, .sprites = &sprite_mgr,
+                .resources = &engine.resources,
+                .renderer = engine.renderer, .ui = &ui,
+                .scene_type = (int)current_scene,
+                .dungeon_level = current_dungeon_level,
+                .fps = engine.fps,
+            };
+            debug_cmd_flush_response(&cmd_adapter, &cmd_ctx);
+        }
+
         /* Auto screenshot/dump from CLI flags */
         if (debug_auto_screenshot_frame >= 0 && frame_counter == debug_auto_screenshot_frame) {
             debug_screenshot(engine.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -1619,6 +1707,7 @@ int main(int argc, char *argv[])
     }
 
     /* Cleanup */
+    debug_cmd_shutdown(&cmd_adapter);
     spritesheet_manager_shutdown(&sprite_mgr);
     effects_cleanup(&effects);
     audio_shutdown(&audio);
