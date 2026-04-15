@@ -102,12 +102,15 @@ static SDL_Surface *apply_diamond_mask(SDL_Surface *src, int w, int h)
                 /* Outside diamond — fully transparent */
                 pixels[y * pitch + x] = 0;
             } else {
-                /* Inside diamond — remove pink/magenta artifacts */
-                Uint8 pr, pg, pb, pa;
-                SDL_GetRGBA(pixels[y * pitch + x], work->format,
-                            &pr, &pg, &pb, &pa);
-                if (pr > 150 && pg < 120 && pb > 130) {
-                    pixels[y * pitch + x] = 0;
+                /* Inside diamond — smooth edge blending near boundary */
+                float edge_dist = 1.0f - (dx + dy);
+                if (edge_dist < 0.05f) {
+                    /* Near edge: partial transparency for anti-aliasing */
+                    Uint8 pr, pg, pb, pa;
+                    SDL_GetRGBA(pixels[y * pitch + x], work->format,
+                                &pr, &pg, &pb, &pa);
+                    Uint8 alpha = (Uint8)(edge_dist / 0.05f * 255.0f);
+                    pixels[y * pitch + x] = SDL_MapRGBA(work->format, pr, pg, pb, alpha);
                 }
             }
         }
@@ -153,8 +156,8 @@ int resource_load_tile_texture(ResourceManager *rm, const char *path, int w, int
 }
 
 /*
- * Load a sprite with color-key transparency. Detects the background color
- * from the top-left corner pixel and makes all matching pixels transparent.
+ * Load a sprite texture. For PNG files with alpha, load directly.
+ * For JPG files, load without color-key (JPG compression makes color-key unreliable).
  */
 int resource_load_sprite_texture(ResourceManager *rm, const char *path)
 {
@@ -169,52 +172,34 @@ int resource_load_sprite_texture(ResourceManager *rm, const char *path)
         return -1;
     }
 
-    /* Convert to 32-bit RGBA for pixel manipulation */
-    SDL_Surface *rgba = SDL_ConvertSurfaceFormat(src, SDL_PIXELFORMAT_RGBA32, 0);
-    SDL_FreeSurface(src);
-    if (!rgba) return -1;
+    /* Check if loaded file is PNG (has alpha) — if so, use directly */
+    const char *ext = strrchr(path, '.');
+    bool is_png = false;
 
-    int sw = rgba->w;
-    int sh = rgba->h;
-
-    SDL_LockSurface(rgba);
-    Uint32 *pixels = (Uint32 *)rgba->pixels;
-    int pitch = rgba->pitch / 4;
-
-    /* Sample 4 corner pixels to detect checkerboard background colors */
-    Uint32 corner_raw[4] = {
-        pixels[0],                              /* top-left */
-        pixels[sw - 1],                         /* top-right */
-        pixels[(sh - 1) * pitch],               /* bottom-left */
-        pixels[(sh - 1) * pitch + (sw - 1)]     /* bottom-right */
-    };
-    Uint8 corner_r[4], corner_g[4], corner_b[4];
-    for (int c = 0; c < 4; c++)
-        SDL_GetRGB(corner_raw[c], rgba->format,
-                   &corner_r[c], &corner_g[c], &corner_b[c]);
-
-    /* Remove all pixels matching any corner color (with tolerance) */
-    #define BG_TOLERANCE 30
-    for (int y = 0; y < sh; y++) {
-        for (int x = 0; x < sw; x++) {
-            Uint8 pr, pg, pb;
-            SDL_GetRGB(pixels[y * pitch + x], rgba->format, &pr, &pg, &pb);
-            for (int c = 0; c < 4; c++) {
-                if (abs((int)pr - corner_r[c]) < BG_TOLERANCE &&
-                    abs((int)pg - corner_g[c]) < BG_TOLERANCE &&
-                    abs((int)pb - corner_b[c]) < BG_TOLERANCE) {
-                    pixels[y * pitch + x] = 0; /* fully transparent */
-                    break;
-                }
-            }
+    /* Check if we actually loaded a .png version */
+    if (ext && strcmp(ext, ".jpg") == 0) {
+        char png_path[256];
+        size_t base_len = (size_t)(ext - path);
+        if (base_len < sizeof(png_path) - 5) {
+            memcpy(png_path, path, base_len);
+            strcpy(png_path + base_len, ".png");
+            FILE *f = fopen(png_path, "r");
+            if (f) { fclose(f); is_png = true; }
         }
+    } else if (ext && strcmp(ext, ".png") == 0) {
+        is_png = true;
     }
-    #undef BG_TOLERANCE
 
-    SDL_UnlockSurface(rgba);
+    SDL_Texture *tex;
+    if (is_png && src->format->Amask != 0) {
+        /* PNG with alpha — use directly, no color-key needed */
+        tex = SDL_CreateTextureFromSurface(rm->renderer, src);
+    } else {
+        /* JPG or no alpha — just load as-is without destructive color-key */
+        tex = SDL_CreateTextureFromSurface(rm->renderer, src);
+    }
+    SDL_FreeSurface(src);
 
-    SDL_Texture *tex = SDL_CreateTextureFromSurface(rm->renderer, rgba);
-    SDL_FreeSurface(rgba);
     if (!tex) {
         fprintf(stderr, "Failed to create sprite texture '%s': %s\n", path, SDL_GetError());
         return -1;
