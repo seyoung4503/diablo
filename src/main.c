@@ -159,8 +159,17 @@ static SDL_Texture *tex_ogden;
 static SDL_Texture *tex_cain;
 static SDL_Texture *tex_npc_fallback;
 
-/* Player/enemy sprite texture */
+/* Player/enemy sprite textures */
 static SDL_Texture *tex_warrior;
+static SDL_Texture *tex_enemies[ENEMY_TYPE_COUNT];  /* per-type enemy textures */
+
+/* Get enemy texture by type, fallback to warrior */
+static SDL_Texture *get_enemy_texture(EnemyType type)
+{
+    if (type > ENEMY_NONE && type < ENEMY_TYPE_COUNT && tex_enemies[type])
+        return tex_enemies[type];
+    return tex_warrior;
+}
 
 /* Get NPC sprite texture by NPC ID */
 static SDL_Texture *get_npc_texture(int npc_id)
@@ -355,7 +364,7 @@ int main(int argc, char *argv[])
         tile_textures[TILE_TREE]        = tex_tree ? tex_tree : tex_grass;
     }
 
-    /* Load character sprites with color-key background removal */
+    /* Load character sprites (PNG preferred — transparent background) */
     {
         int idx;
         idx = resource_load_sprite_texture(&engine.resources,
@@ -379,6 +388,26 @@ int main(int argc, char *argv[])
         tex_cain = resource_get_texture(&engine.resources, idx);
 
         tex_npc_fallback = tex_warrior;
+    }
+
+    /* Load per-type enemy sprites */
+    {
+        memset(tex_enemies, 0, sizeof(tex_enemies));
+        struct { EnemyType type; const char *path; } enemy_sprites[] = {
+            { ENEMY_FALLEN,    "assets/sprites/enemies/fallen.jpg" },
+            { ENEMY_SKELETON,  "assets/sprites/enemies/skeleton.jpg" },
+            { ENEMY_ZOMBIE,    "assets/sprites/enemies/zombie.jpg" },
+            { ENEMY_GOAT_MAN,  "assets/sprites/enemies/goat_man.jpg" },
+            { ENEMY_MAGE,      "assets/sprites/enemies/mage.jpg" },
+            { ENEMY_KNIGHT,    "assets/sprites/enemies/knight.jpg" },
+            { ENEMY_BALROG,    "assets/sprites/enemies/balrog.jpg" },
+        };
+        int enemy_sprite_count = (int)(sizeof(enemy_sprites) / sizeof(enemy_sprites[0]));
+        for (int i = 0; i < enemy_sprite_count; i++) {
+            int idx = resource_load_sprite_texture(&engine.resources, enemy_sprites[i].path);
+            if (idx >= 0)
+                tex_enemies[enemy_sprites[i].type] = resource_get_texture(&engine.resources, idx);
+        }
     }
 
     /* Load HUD font — try several system font paths */
@@ -1323,17 +1352,23 @@ int main(int argc, char *argv[])
                                          (int)e->world_x, (int)e->world_y,
                                          cam_x, cam_y, SPRITE_SIZE, SPRITE_SIZE);
                 SDL_SetTextureColorMod(sheet_tex, 255, 255, 255);
-            } else if (tex_warrior) {
-                SDL_SetTextureColorMod(tex_warrior, tint_r, tint_g, tint_b);
-                SDL_Rect dst = { e_sx, e_sy, SPRITE_SIZE, SPRITE_SIZE };
-                SDL_RenderCopy(engine.renderer, tex_warrior, NULL, &dst);
-                SDL_SetTextureColorMod(tex_warrior, 255, 255, 255);
             } else {
-                SDL_Color enemy_body = { 140, 40, 40, 255 };
-                SDL_Color enemy_head = { 180, 80, 60, 255 };
-                iso_draw_character(&iso_renderer,
-                                   e->tile_x, e->tile_y,
-                                   cam_x, cam_y, enemy_body, enemy_head);
+                /* Use per-type enemy texture, fallback to warrior */
+                SDL_Texture *etex = get_enemy_texture(e->type);
+                if (etex) {
+                    if (e->variant != ENEMY_VARIANT_NORMAL)
+                        SDL_SetTextureColorMod(etex, tint_r, tint_g, tint_b);
+                    SDL_Rect dst = { e_sx, e_sy, SPRITE_SIZE, SPRITE_SIZE };
+                    SDL_RenderCopy(engine.renderer, etex, NULL, &dst);
+                    if (e->variant != ENEMY_VARIANT_NORMAL)
+                        SDL_SetTextureColorMod(etex, 255, 255, 255);
+                } else {
+                    SDL_Color enemy_body = { 140, 40, 40, 255 };
+                    SDL_Color enemy_head = { 180, 80, 60, 255 };
+                    iso_draw_character(&iso_renderer,
+                                       e->tile_x, e->tile_y,
+                                       cam_x, cam_y, enemy_body, enemy_head);
+                }
             }
 
             /* HP bar above enemy */
